@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { CalendarDays, Filter, UserRoundX } from "lucide-react";
+import { CalendarDays, Filter, UserRoundX } from "~/components/ui/icons";
 import { useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle } from "~/components/ui/icons";
 import { useSearchParams } from "next/navigation";
 import { useState } from "react";
 

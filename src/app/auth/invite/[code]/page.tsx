@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { AlertCircle, UserRoundPlus } from "lucide-react";
+import { AlertCircle, UserRoundPlus } from "~/components/ui/icons";
 import { useParams } from "next/navigation";
 import { useSearchParams } from "next/navigation";
 import { useState } from "react";
@@ -132,3 +132,4 @@ export default function InviteAcceptancePage() {
     </main>
   );
 }
+

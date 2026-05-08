@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { CheckCircle2, UserRoundPlus } from "lucide-react";
+import { CheckCircle2, UserRoundPlus } from "~/components/ui/icons";
 import { useState } from "react";
 
 import { Button } from "~/components/ui/button";

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Clock3, Image as ImageIcon, UserRoundX } from "lucide-react";
+import { Clock3, Image as ImageIcon, UserRoundX } from "~/components/ui/icons";
 import { useParams } from "next/navigation";
 
 import { MemberProfileHeader } from "~/components/members/member-profile-header";
@@ -124,3 +124,4 @@ export default function MemberProfilePage() {
     </section>
   );
 }
+

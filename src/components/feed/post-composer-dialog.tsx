@@ -1,6 +1,6 @@
 "use client";
 
-import { ImagePlus, Loader2, Video, X } from "lucide-react";
+import { ImagePlus, Loader2, Video, X } from "~/components/ui/icons";
 import { useMemo, useState } from "react";
 
 import { Button } from "~/components/ui/button";

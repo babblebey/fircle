@@ -1,4 +1,4 @@
-import { Bell } from "lucide-react";
+import { Bell } from "~/components/ui/icons";
 
 import { NotificationCard } from "~/components/notifications/notification-card";
 import { tagNotifications, type TagNotificationItem } from "~/lib/mocks/tagging";

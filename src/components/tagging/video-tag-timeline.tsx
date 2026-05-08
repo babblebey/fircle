@@ -1,6 +1,6 @@
 "use client";
 
-import { Clock3 } from "lucide-react";
+import { Clock3 } from "~/components/ui/icons";
 
 import type { VideoTagMoment } from "~/lib/mocks/tagging";
 import { cn } from "~/lib/utils";

@@ -1,4 +1,4 @@
-import { PlayCircle } from "lucide-react";
+import { PlayCircle } from "~/components/ui/icons";
 
 type PostVideoCardProps = {
   title: string;

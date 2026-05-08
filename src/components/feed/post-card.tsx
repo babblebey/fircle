@@ -1,4 +1,4 @@
-import { Heart, MessageCircle, Share2 } from "lucide-react";
+import { Heart, Comment, Share } from "~/components/ui/icons";
 
 import { Button } from "~/components/ui/button";
 
@@ -115,11 +115,11 @@ export function PostCard({ post }: PostCardProps) {
           Like
         </Button>
         <Button type="button" variant="ghost" size="sm" className="rounded-2xl">
-          <MessageCircle className="size-4" />
+          <Comment className="size-4" />
           Comment
         </Button>
         <Button type="button" variant="ghost" size="sm" className="rounded-2xl">
-          <Share2 className="size-4" />
+          <Share className="size-4" />
           Share
         </Button>
       </div>

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Clock3 } from "lucide-react";
+import { Clock3 } from "~/components/ui/icons";
 
 import type { FamilyMemberSummary } from "~/lib/mocks/family-members";
 import { cn } from "~/lib/utils";

@@ -1,5 +1,5 @@
 import Image from "next/image";
-import { Bell, Image as ImageIcon, UserCheck, UserX, Video } from "lucide-react";
+import { Bell, Image as ImageIcon, UserCheck, UserX, Video } from "~/components/ui/icons";
 
 import type { TagNotificationItem } from "~/lib/mocks/tagging";
 

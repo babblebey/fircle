@@ -1,6 +1,6 @@
 "use client";
 
-import { Bell, Menu } from "lucide-react";
+import { Bell, Menu } from "~/components/ui/icons";
 
 import { Button } from "~/components/ui/button";
 

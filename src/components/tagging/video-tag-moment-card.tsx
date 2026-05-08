@@ -1,4 +1,4 @@
-import { Clock3, Tag } from "lucide-react";
+import { Clock3, Tag } from "~/components/ui/icons";
 
 import { MemberStatusBadge } from "~/components/members/member-status-badge";
 import type { VideoTagMoment } from "~/lib/mocks/tagging";

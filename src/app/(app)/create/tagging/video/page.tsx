@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeft, Film, ListVideo, Sparkles } from "lucide-react";
+import { ArrowLeft, Film, ListVideo, Sparkles } from "~/components/ui/icons";
 import { useState } from "react";
 
 import { VideoTagMomentCard } from "~/components/tagging/video-tag-moment-card";

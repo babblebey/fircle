@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Check, Copy, Link2, Plus, ShieldAlert, X } from "lucide-react";
+import { Check, Copy, Link2, Plus, ShieldAlert, X } from "~/components/ui/icons";
 
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";

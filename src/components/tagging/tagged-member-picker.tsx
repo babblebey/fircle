@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Search, Tag } from "lucide-react";
+import { Check, Search, Tag } from "~/components/ui/icons";
 import { useMemo, useState } from "react";
 
 import { MemberStatusBadge } from "~/components/members/member-status-badge";

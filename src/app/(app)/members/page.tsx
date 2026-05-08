@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Users } from "lucide-react";
+import { Users } from "~/components/ui/icons";
 import { useMemo, useState } from "react";
 
 import { MemberCard } from "~/components/members/member-card";

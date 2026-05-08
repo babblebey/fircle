@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, ImagePlus, Layers3, Sparkles } from "lucide-react";
+import { ArrowRight, ImagePlus, Layers3, Sparkles } from "~/components/ui/icons";
 import { useMemo, useState } from "react";
 
 import { MemberStatusBadge } from "~/components/members/member-status-badge";

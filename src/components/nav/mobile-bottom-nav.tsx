@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bell, House, PlusCircle, UserCircle, Users } from "lucide-react";
+import { Bell, House, PlusCircle, User, Users } from "~/components/ui/icons";
 
 import { cn } from "~/lib/utils";
 
@@ -11,7 +11,7 @@ const items = [
   { href: "/members", label: "Members", icon: Users },
   { href: "/create", label: "Create", icon: PlusCircle, prominent: true },
   { href: "/notifications", label: "Notifications", icon: Bell },
-  { href: "/profile", label: "Profile", icon: UserCircle },
+  { href: "/profile", label: "Profile", icon: User },
 ];
 
 function isActivePath(pathname: string, href: string) {

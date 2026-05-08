@@ -1,6 +1,6 @@
 "use client";
 
-import { ImageOff } from "lucide-react";
+import { ImageOff } from "~/components/ui/icons";
 import { useEffect, useState } from "react";
 
 import { ComposerEntry } from "~/components/feed/composer-entry";

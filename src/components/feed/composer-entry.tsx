@@ -1,4 +1,4 @@
-import { ImagePlus, Video } from "lucide-react";
+import { ImagePlus, Video } from "~/components/ui/icons";
 
 import { Button } from "~/components/ui/button";
 

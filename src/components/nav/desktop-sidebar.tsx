@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bell, House, Plus, Settings, UserCircle, Users } from "lucide-react";
+import { Bell, House, Plus, Settings, User, Users } from "~/components/ui/icons";
 
 import { ThemeToggle } from "~/components/theme-toggle";
 import { Button } from "~/components/ui/button";
@@ -12,7 +12,7 @@ const items = [
   { href: "/", label: "Feed", icon: House },
   { href: "/members", label: "Members", icon: Users },
   { href: "/notifications", label: "Notifications", icon: Bell },
-  { href: "/profile", label: "Profile", icon: UserCircle },
+  { href: "/profile", label: "Profile", icon: User },
 ];
 
 function isActivePath(pathname: string, href: string) {

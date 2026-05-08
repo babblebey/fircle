@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { FileText, Image as ImageIcon, PlayCircle, Tag } from "lucide-react";
+import { FileText, Image as ImageIcon, PlayCircle, Tag } from "~/components/ui/icons";
 
 import { MemberStatusBadge } from "~/components/members/member-status-badge";
 import { Button } from "~/components/ui/button";

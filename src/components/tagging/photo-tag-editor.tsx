@@ -1,4 +1,4 @@
-import { Crosshair, Tag } from "lucide-react";
+import { Crosshair, Tag } from "~/components/ui/icons";
 
 import { cn } from "~/lib/utils";
 import type { PhotoTaggingExample } from "~/lib/mocks/tagging";
