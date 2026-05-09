@@ -3,6 +3,8 @@ import { Heart, Comment, Share } from "~/components/ui/icons";
 import { Button } from "~/components/ui/button";
 
 import { PostMediaGrid } from "./post-media-grid";
+import { TaggedMemberAvatarStack } from "./tagged-member-avatar-stack";
+import { PostMixedMediaStack } from "./post-mixed-media-stack";
 import { PostVideoCard } from "./post-video-card";
 
 type PostMediaItem = {
@@ -23,7 +25,7 @@ export type PostCardData = {
   createdAtLabel: string;
   body: string;
   mediaItems: PostMediaItem[];
-  taggedMembers: string[];
+  taggedMembers: { name: string; avatarUrl: string }[];
   reactionCount: number;
   commentCount: number;
 };
@@ -31,6 +33,50 @@ export type PostCardData = {
 type PostCardProps = {
   post: PostCardData;
 };
+
+function renderBody(
+  body: string,
+  taggedMembers: { name: string; avatarUrl: string }[],
+): React.ReactNode {
+  if (taggedMembers.length === 0) return body;
+
+  // Build a regex that matches any @MemberName token
+  const names = taggedMembers.map((m) => m.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  const pattern = new RegExp(`@(${names.join("|")})`, "g");
+
+  const parts: React.ReactNode[] = [];
+  let last = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = pattern.exec(body)) !== null) {
+    if (match.index > last) parts.push(body.slice(last, match.index));
+    const memberName = match[1]!;
+    const member = taggedMembers.find((m) => m.name === memberName);
+    parts.push(
+      <a
+        href="#"
+        key={`${memberName}-${match.index}`}
+        className="mx-0.5 inline-flex items-center gap-1 align-middle whitespace-nowrap"
+      >
+        {member?.avatarUrl ? (
+          <img
+            src={member.avatarUrl}
+            alt={memberName}
+            className="size-4 rounded-full object-cover"
+          />
+        ) : (
+          <span className="flex size-4 items-center justify-center rounded-full bg-border text-[8px] font-semibold text-foreground">
+            {memberName[0]?.toUpperCase()}
+          </span>
+        )}
+        <span className="font-medium leading-none text-foreground">{memberName}</span>
+      </a>,
+    );
+    last = match.index + match[0].length;
+  }
+  if (last < body.length) parts.push(body.slice(last));
+  return parts;
+}
 
 function getInitials(name: string) {
   return name
@@ -44,6 +90,7 @@ function getInitials(name: string) {
 export function PostCard({ post }: PostCardProps) {
   const imageItems = post.mediaItems.filter((item) => item.type === "image");
   const videoItems = post.mediaItems.filter((item) => item.type === "video");
+  const shouldUseMixedMediaStack = post.type === "mixed" && post.mediaItems.length > 4;
 
   return (
     <article className="rounded-3xl border border-border/80 bg-card/90 p-4 shadow-sm sm:p-5">
@@ -58,26 +105,15 @@ export function PostCard({ post }: PostCardProps) {
           </div>
         </div>
 
-        <span className="rounded-full border border-border bg-muted px-2.5 py-1 text-[11px] uppercase tracking-wide text-muted-foreground">
-          {post.type}
-        </span>
+        {post.taggedMembers.length > 0 && post.type !== "text" ? (
+          <TaggedMemberAvatarStack members={post.taggedMembers} />
+        ) : null}
       </header>
 
       {post.body ? (
-        <p className="mt-3 text-foreground text-sm leading-6 sm:text-base">{post.body}</p>
-      ) : null}
-
-      {post.taggedMembers.length > 0 ? (
-        <div className="mt-3 flex flex-wrap gap-2">
-          {post.taggedMembers.map((member) => (
-            <span
-              key={`${post.id}-${member}`}
-              className="rounded-full border border-border/80 bg-muted px-2.5 py-1 text-[11px] text-muted-foreground"
-            >
-              {member}
-            </span>
-          ))}
-        </div>
+        <p className="mt-3 text-foreground text-sm leading-6 sm:text-base">
+          {renderBody(post.body, post.type === "text" ? post.taggedMembers : [])}
+        </p>
       ) : null}
 
       {post.type === "photo" && imageItems.length > 0 ? (
@@ -89,36 +125,41 @@ export function PostCard({ post }: PostCardProps) {
       {post.type === "video" && videoItems.length > 0 ? (
         <div className="mt-3 space-y-2">
           {videoItems.map((item) => (
-            <PostVideoCard key={item.id} title={item.alt} durationLabel={item.durationLabel} />
+            <PostVideoCard
+              key={item.id}
+              title={item.alt}
+              durationLabel={item.durationLabel}
+            />
           ))}
         </div>
       ) : null}
 
       {post.type === "mixed" ? (
         <div className="mt-3 space-y-2">
-          {imageItems.length > 0 ? <PostMediaGrid items={imageItems} /> : null}
-          {videoItems.map((item) => (
-            <PostVideoCard key={item.id} title={item.alt} durationLabel={item.durationLabel} />
-          ))}
+          {shouldUseMixedMediaStack ? (
+            <PostMixedMediaStack items={post.mediaItems} />
+          ) : (
+            <PostMediaGrid items={post.mediaItems} />
+          )}
         </div>
       ) : null}
 
-      <div className="mt-4 flex flex-wrap items-center gap-2 text-muted-foreground text-xs">
-        <span>{post.reactionCount} reactions</span>
-        <span aria-hidden>•</span>
-        <span>{post.commentCount} comments</span>
-      </div>
-
-      <div className="mt-3 flex items-center gap-2 border-border/70 border-t pt-3">
-        <Button type="button" variant="ghost" size="sm" className="rounded-2xl">
+      <div className="mt-4 flex flex-wrap items-center gap-2 border-border/70 pt-2">
+        <Button type="button" variant="ghost" size="sm" className="rounded-2xl px-3">
           <Heart className="size-4" />
           Like
+          <span className="rounded-full bg-muted px-1.5 py-0.5 text-xs tabular-nums text-muted-foreground">
+            {post.reactionCount}
+          </span>
         </Button>
-        <Button type="button" variant="ghost" size="sm" className="rounded-2xl">
+        <Button type="button" variant="ghost" size="sm" className="rounded-2xl px-3">
           <Comment className="size-4" />
           Comment
+          <span className="rounded-full bg-muted px-1.5 py-0.5 text-xs tabular-nums text-muted-foreground">
+            {post.commentCount}
+          </span>
         </Button>
-        <Button type="button" variant="ghost" size="sm" className="rounded-2xl">
+        <Button type="button" variant="ghost" size="sm" className="ml-auto rounded-2xl px-3">
           <Share className="size-4" />
           Share
         </Button>

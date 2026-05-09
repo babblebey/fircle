@@ -1,7 +1,11 @@
+import { PlayCircle } from "~/components/ui/icons";
+
 type PostMediaGridItem = {
   id: string;
+  type?: "image" | "video";
   url: string;
   alt: string;
+  durationLabel?: string;
 };
 
 type PostMediaGridProps = {
@@ -26,7 +30,8 @@ export function PostMediaGrid({ items }: PostMediaGridProps) {
   return (
     <div className={`grid gap-2 ${getGridClass(visibleItems.length)}`}>
       {visibleItems.map((item, index) => {
-        const shouldSpanTwo = visibleItems.length === 3 && index === 0;
+        const shouldSpanTwo = visibleItems.length === 3 && index === 2;
+        const isVideo = item.type === "video";
 
         return (
           <article
@@ -35,12 +40,28 @@ export function PostMediaGrid({ items }: PostMediaGridProps) {
               shouldSpanTwo ? "sm:col-span-2" : ""
             }`}
           >
-            <div className="aspect-video p-3">
-              <div className="flex h-full items-end justify-between rounded-xl border border-border/70 bg-background/70 p-3">
-                <p className="line-clamp-2 text-xs text-muted-foreground">{item.alt}</p>
-                <span className="rounded-full border border-border bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">
-                  Photo
-                </span>
+            <div className="aspect-video p-1.5 sm:p-3">
+              <div className="relative flex h-full items-end justify-between rounded-xl border border-border/70 bg-background p-3">
+                {isVideo ? (
+                  <PlayCircle
+                    className="pointer-events-none absolute left-1/2 top-1/2 size-7 -translate-x-1/2 -translate-y-1/2 text-muted-foreground sm:size-10 fill-accent-foreground"
+                    aria-hidden="true"
+                  />
+                ) : null}
+
+                <p
+                  className={`text-xs text-muted-foreground ${
+                    isVideo ? "max-w-[75%] truncate" : "max-w-full truncate"
+                  }`}
+                >
+                  {item.alt}
+                </p>
+
+                {isVideo && item.durationLabel ? (
+                  <span className="absolute bottom-2 right-2 rounded-full border border-border bg-background/90 px-2 py-0.5 text-[11px] text-foreground">
+                    {item.durationLabel}
+                  </span>
+                ) : null}
               </div>
             </div>
           </article>
