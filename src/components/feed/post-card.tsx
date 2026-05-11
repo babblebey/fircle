@@ -1,3 +1,8 @@
+"use client";
+
+import { usePathname, useRouter } from "next/navigation";
+import { useState } from "react";
+
 import { Heart, Comment, Share } from "~/components/ui/icons";
 
 import { Button } from "~/components/ui/button";
@@ -6,6 +11,7 @@ import { PostMediaGrid } from "./post-media-grid";
 import { TaggedMemberAvatarStack } from "./tagged-member-avatar-stack";
 import { PostMixedMediaStack } from "./post-mixed-media-stack";
 import { PostVideoCard } from "./post-video-card";
+import { MediaViewerDialog } from "./media-viewer-dialog";
 
 type PostMediaItem = {
   id: string;
@@ -13,6 +19,7 @@ type PostMediaItem = {
   url: string;
   alt: string;
   durationLabel?: string;
+  taggedMembers?: { name: string; avatarUrl: string }[];
 };
 
 export type PostCardData = {
@@ -88,12 +95,47 @@ function getInitials(name: string) {
 }
 
 export function PostCard({ post }: PostCardProps) {
+  const pathname = usePathname();
+  const router = useRouter();
+  const [viewerOpen, setViewerOpen] = useState(false);
+  const [viewerStart, setViewerStart] = useState(0);
+
+  function openViewer(index: number) {
+    setViewerStart(index);
+    setViewerOpen(true);
+  }
+
   const imageItems = post.mediaItems.filter((item) => item.type === "image");
   const videoItems = post.mediaItems.filter((item) => item.type === "video");
   const shouldUseMixedMediaStack = post.type === "mixed" && post.mediaItems.length > 4;
+  const isClickable = !pathname?.startsWith("/post/");
+
+  function navigateToPost() {
+    router.push(`/post/${post.id}`);
+  }
 
   return (
-    <article className="rounded-3xl border border-border/80 bg-card/90 p-4 shadow-sm sm:p-5">
+    <article
+      role={isClickable ? "link" : undefined}
+      tabIndex={isClickable ? 0 : undefined}
+      aria-label={isClickable ? `Open post by ${post.author.name}` : undefined}
+      className={`rounded-3xl border border-border/80 bg-card/90 p-4 shadow-sm sm:p-5 ${
+        isClickable
+          ? "cursor-pointer outline-none transition-colors hover:border-border hover:bg-card"
+          : "cursor-default"
+      }`}
+      onClick={isClickable ? navigateToPost : undefined}
+      onKeyDown={
+        isClickable
+          ? (event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                navigateToPost();
+              }
+            }
+          : undefined
+      }
+    >
       <header className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-3">
           <div className="flex size-10 items-center justify-center rounded-full border border-border bg-muted text-xs font-semibold text-foreground">
@@ -117,34 +159,47 @@ export function PostCard({ post }: PostCardProps) {
       ) : null}
 
       {post.type === "photo" && imageItems.length > 0 ? (
-        <div className="mt-3">
-          <PostMediaGrid items={imageItems} />
+        <div className="mt-3" onClick={(event) => event.stopPropagation()}>
+          <PostMediaGrid
+            items={imageItems}
+            onItemClick={(localIdx) => {
+              const globalIdx = post.mediaItems.findIndex((m) => m.id === imageItems[localIdx]?.id);
+              openViewer(globalIdx >= 0 ? globalIdx : localIdx);
+            }}
+          />
         </div>
       ) : null}
 
       {post.type === "video" && videoItems.length > 0 ? (
-        <div className="mt-3 space-y-2">
+        <div className="mt-3 space-y-2" onClick={(event) => event.stopPropagation()}>
           {videoItems.map((item) => (
             <PostVideoCard
               key={item.id}
               title={item.alt}
               durationLabel={item.durationLabel}
+              onClick={() => {
+                const globalIdx = post.mediaItems.findIndex((m) => m.id === item.id);
+                openViewer(globalIdx >= 0 ? globalIdx : 0);
+              }}
             />
           ))}
         </div>
       ) : null}
 
       {post.type === "mixed" ? (
-        <div className="mt-3 space-y-2">
+        <div className="mt-3 space-y-2" onClick={(event) => event.stopPropagation()}>
           {shouldUseMixedMediaStack ? (
-            <PostMixedMediaStack items={post.mediaItems} />
+            <PostMixedMediaStack items={post.mediaItems} onItemClick={openViewer} />
           ) : (
-            <PostMediaGrid items={post.mediaItems} />
+            <PostMediaGrid items={post.mediaItems} onItemClick={openViewer} />
           )}
         </div>
       ) : null}
 
-      <div className="mt-4 flex flex-wrap items-center gap-2 border-border/70 pt-2">
+      <div
+        className="mt-4 flex flex-wrap items-center gap-2 border-border/70 pt-2"
+        onClick={(event) => event.stopPropagation()}
+      >
         <Button type="button" variant="ghost" size="sm" className="rounded-2xl px-3">
           <Heart className="size-4" />
           Like
@@ -164,6 +219,13 @@ export function PostCard({ post }: PostCardProps) {
           Share
         </Button>
       </div>
+
+      <MediaViewerDialog
+        items={post.mediaItems}
+        startIndex={viewerStart}
+        open={viewerOpen}
+        onOpenChange={setViewerOpen}
+      />
     </article>
   );
 }
