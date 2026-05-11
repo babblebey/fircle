@@ -44,7 +44,7 @@ export function MemberAdminActionsPanel({ member }: MemberAdminPanelProps) {
           <p className="text-xs text-muted-foreground">Profile management</p>
           <p className="mt-1 text-sm font-medium">Edit member basics</p>
           <p className="mt-1 text-xs text-muted-foreground">
-            Update this member's name, profile picture, date of birth, and related profile details.
+            Update this member&apos;s name, profile picture, date of birth, and related profile details.
           </p>
           <EditProfileDialog member={member} triggerText="Edit member profile" triggerClassName="mt-3 w-full" />
         </div>

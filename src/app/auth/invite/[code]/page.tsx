@@ -2,37 +2,153 @@
 
 import Link from "next/link";
 import { AlertCircle, UserRoundPlus } from "~/components/ui/icons";
-import { useParams } from "next/navigation";
-import { useSearchParams } from "next/navigation";
+import { signIn } from "next-auth/react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 
 import { ThemeToggle } from "~/components/theme-toggle";
 import { Alert, AlertDescription, AlertTitle } from "~/components/ui/alert";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
+import { api } from "~/trpc/react";
+
+type InvitePageState = "loading" | "valid" | "expired" | "claimed" | "revoked" | "invalid";
+
+function getFormString(formData: FormData, key: string) {
+  const value = formData.get(key);
+  return typeof value === "string" ? value : "";
+}
+
+function mapInviteStateFromErrorMessage(message: string): InvitePageState {
+  const normalized = message.toLowerCase();
+  if (normalized.includes("expired")) return "expired";
+  if (normalized.includes("already been used") || normalized.includes("claimed")) {
+    return "claimed";
+  }
+  if (normalized.includes("revoked")) return "revoked";
+  if (normalized.includes("not found")) return "invalid";
+  return "invalid";
+}
+
+function mapAcceptInviteErrorMessage(message: string): string {
+  if (message.includes("reserved for a different email")) {
+    return "This invite is reserved for a different email address.";
+  }
+  if (message.includes("already exists")) {
+    return "That email is already registered. Try signing in instead.";
+  }
+  if (message.includes("expired")) {
+    return "This invite has expired. Please request a new one.";
+  }
+  if (message.includes("already been used")) {
+    return "This invite has already been used.";
+  }
+  if (message.includes("revoked")) {
+    return "This invite has been revoked.";
+  }
+  if (message.includes("not found")) {
+    return "This invite link is invalid.";
+  }
+  return "Could not accept invite. Please try again.";
+}
+
+function getInviteStateMessage(state: InvitePageState): string {
+  if (state === "expired") return "This invite has expired. Please request a new one.";
+  if (state === "claimed") return "This invite has already been used.";
+  if (state === "revoked") return "This invite has been revoked.";
+  if (state === "invalid") return "This invite link is invalid.";
+  return "";
+}
 
 export default function InviteAcceptancePage() {
   const [isLoading, setIsLoading] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+  const router = useRouter();
   const params = useParams<{ code: string }>();
   const searchParams = useSearchParams();
   const errorType = searchParams.get("error");
+  const callbackUrl = searchParams.get("callbackUrl") ?? "/";
+
+  const inviteQuery = api.invite.getByCode.useQuery(
+    { code: params.code },
+    {
+      retry: false,
+      refetchOnWindowFocus: false,
+    },
+  );
+  const acceptInvite = api.invite.acceptInvite.useMutation();
 
   const errorMessageByType: Record<string, string> = {
     expired: "This invite has expired. Please request a new one.",
     used: "This invite has already been used.",
+    invalid: "This invite link is invalid.",
+    revoked: "This invite has been revoked.",
     "email-conflict": "That email is already registered. Try signing in instead.",
   };
 
-  const errorMessage = errorType ? errorMessageByType[errorType] : null;
+  const queryState: InvitePageState = inviteQuery.isLoading
+    ? "loading"
+    : inviteQuery.data
+      ? "valid"
+      : mapInviteStateFromErrorMessage(inviteQuery.error?.message ?? "");
 
-  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+  const stateErrorMessage = queryState === "valid" || queryState === "loading"
+    ? null
+    : getInviteStateMessage(queryState);
+
+  const errorMessage =
+    formError ??
+    stateErrorMessage ??
+    (errorType ? errorMessageByType[errorType] : null);
+
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    if (isLoading) {
+    if (isLoading || queryState !== "valid") {
       return;
     }
 
+    const formData = new FormData(event.currentTarget);
+    const name = getFormString(formData, "name").trim();
+    const email = getFormString(formData, "email").trim();
+    const password = getFormString(formData, "password");
+
     setIsLoading(true);
+    setFormError(null);
+
+    try {
+      await acceptInvite.mutateAsync({
+        code: params.code,
+        name,
+        email,
+        password,
+      });
+
+      const signInResult = await signIn("credentials", {
+        email,
+        password,
+        redirect: false,
+        callbackUrl,
+      });
+
+      if (!signInResult || signInResult.error) {
+        const next = new URLSearchParams();
+        next.set("error", "invalid");
+        next.set("callbackUrl", callbackUrl);
+        router.replace(`/auth/signin?${next.toString()}`);
+        return;
+      }
+
+      router.replace(signInResult.url ?? callbackUrl);
+    } catch (error) {
+      if (error instanceof Error) {
+        setFormError(mapAcceptInviteErrorMessage(error.message));
+      } else {
+        setFormError("Could not accept invite. Please try again.");
+      }
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -58,13 +174,30 @@ export default function InviteAcceptancePage() {
                 <UserRoundPlus className="size-4" aria-hidden="true" />
               </div>
               <div className="space-y-2">
-                <p className="text-sm text-muted-foreground">
-                  Invited by <span className="font-semibold text-foreground">John Smith</span>
-                </p>
-                <p className="text-base font-semibold">The Smith Family</p>
-                <p className="text-sm leading-6 text-muted-foreground">
-                  A close-knit family sharing memories, photos, and updates.
-                </p>
+                {inviteQuery.isLoading ? (
+                  <>
+                    <p className="text-sm text-muted-foreground">Checking invite details...</p>
+                    <p className="text-base font-semibold">Loading family</p>
+                  </>
+                ) : inviteQuery.data ? (
+                  <>
+                    <p className="text-sm text-muted-foreground">Valid invite</p>
+                    <p className="text-base font-semibold">{inviteQuery.data.family.name}</p>
+                    {inviteQuery.data.family.description ? (
+                      <p className="text-sm leading-6 text-muted-foreground">
+                        {inviteQuery.data.family.description}
+                      </p>
+                    ) : null}
+                  </>
+                ) : (
+                  <>
+                    <p className="text-sm text-muted-foreground">Invite status</p>
+                    <p className="text-base font-semibold capitalize">{queryState}</p>
+                    <p className="text-sm leading-6 text-muted-foreground">
+                      {getInviteStateMessage(queryState)}
+                    </p>
+                  </>
+                )}
               </div>
             </div>
           </div>
@@ -79,12 +212,13 @@ export default function InviteAcceptancePage() {
             </Alert>
           ) : null}
 
-          <form action="#" className="space-y-4" onSubmit={handleSubmit}>
+          {queryState === "valid" ? (
+            <form action="#" className="space-y-4" onSubmit={handleSubmit}>
             <div className="space-y-2">
               <label htmlFor="name" className="text-sm font-medium">
                 Full name
               </label>
-              <Input id="name" placeholder="Your full name" autoComplete="name" required />
+              <Input id="name" name="name" placeholder="Your full name" autoComplete="name" required />
             </div>
 
             <div className="space-y-2">
@@ -93,6 +227,7 @@ export default function InviteAcceptancePage() {
               </label>
               <Input
                 id="email"
+                name="email"
                 type="email"
                 placeholder="email@family.com"
                 autoComplete="email"
@@ -106,6 +241,7 @@ export default function InviteAcceptancePage() {
               </label>
               <Input
                 id="password"
+                name="password"
                 type="password"
                 placeholder="Create a password"
                 autoComplete="new-password"
@@ -116,7 +252,12 @@ export default function InviteAcceptancePage() {
             <Button type="submit" size="lg" className="w-full" disabled={isLoading}>
               {isLoading ? "Creating account..." : "Accept & Create Account"}
             </Button>
-          </form>
+            </form>
+          ) : (
+            <Button asChild size="lg" className="w-full">
+              <Link href="/auth/signin">Go to sign in</Link>
+            </Button>
+          )}
 
           <p className="text-center text-sm text-muted-foreground sm:text-left">
             Already have an account?{" "}
