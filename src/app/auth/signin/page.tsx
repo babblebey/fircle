@@ -16,12 +16,22 @@ function getFormString(formData: FormData, key: string) {
   return typeof value === "string" ? value : "";
 }
 
+function sanitizeCallbackUrl(rawCallbackUrl: string | null) {
+  const value = rawCallbackUrl?.trim();
+
+  if (!value || !value.startsWith("/") || value.startsWith("//")) {
+    return "/";
+  }
+
+  return value;
+}
+
 export default function SignInPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const router = useRouter();
   const searchParams = useSearchParams();
-  const callbackUrl = searchParams.get("callbackUrl") ?? "/";
+  const callbackUrl = sanitizeCallbackUrl(searchParams.get("callbackUrl"));
   const errorType = searchParams.get("error");
   const claimSuccess = searchParams.get("claimed") === "1";
 

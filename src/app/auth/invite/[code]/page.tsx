@@ -19,6 +19,16 @@ function getFormString(formData: FormData, key: string) {
   return typeof value === "string" ? value : "";
 }
 
+function sanitizeCallbackUrl(rawCallbackUrl: string | null) {
+  const value = rawCallbackUrl?.trim();
+
+  if (!value || !value.startsWith("/") || value.startsWith("//")) {
+    return "/";
+  }
+
+  return value;
+}
+
 function mapInviteStateFromErrorMessage(message: string): InvitePageState {
   const normalized = message.toLowerCase();
   if (normalized.includes("expired")) return "expired";
@@ -67,7 +77,7 @@ export default function InviteAcceptancePage() {
   const params = useParams<{ code: string }>();
   const searchParams = useSearchParams();
   const errorType = searchParams.get("error");
-  const callbackUrl = searchParams.get("callbackUrl") ?? "/";
+  const callbackUrl = sanitizeCallbackUrl(searchParams.get("callbackUrl"));
 
   const inviteQuery = api.invite.getByCode.useQuery(
     { code: params.code },
