@@ -368,7 +368,7 @@ export function PostComposerDialog({
       aria-modal="true"
       aria-label="Create memory"
     >
-      <div className="w-full max-w-xl rounded-3xl border border-border/80 bg-card p-4 shadow-2xl sm:p-6">
+      <div className="flex max-h-[calc(100dvh-1.5rem)] w-full max-w-xl flex-col overflow-hidden rounded-3xl border border-border/80 bg-card p-4 shadow-2xl sm:max-h-[calc(100dvh-3rem)] sm:p-6">
         <header className="flex items-start justify-between gap-4">
           <div>
             <h2 className="font-semibold text-xl tracking-tight">Create memory</h2>
@@ -388,7 +388,7 @@ export function PostComposerDialog({
           </Button>
         </header>
 
-        <div className="mt-4 space-y-4">
+        <div className="mt-4 flex min-h-0 flex-1 flex-col gap-4 overflow-hidden">
           <input
             ref={imageInputRef}
             type="file"
@@ -416,7 +416,7 @@ export function PostComposerDialog({
             value={caption}
             onChange={(event) => setCaption(event.target.value)}
             placeholder="Write a caption for this memory..."
-            rows={5}
+            rows={4}
             className="w-full resize-none rounded-2xl border border-border bg-background px-4 py-3 text-sm outline-none transition focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30"
           />
 
@@ -441,15 +441,15 @@ export function PostComposerDialog({
           </div>
 
           {selectedMedia.length > 0 ? (
-            <div className="space-y-3">
+            <div className="flex min-h-0 flex-1 flex-col gap-3">
               <p className="text-muted-foreground text-xs">
                 {selectedMedia.length} / {MAX_FILES_PER_POST} media selected
               </p>
-              <ul className="space-y-3">
+              <ul className="min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
                 {selectedMedia.map((item) => (
                   <li key={item.id} className="rounded-2xl border border-border/80 bg-muted/30 p-3">
                     <div className="flex items-start gap-3">
-                      <div className="h-20 w-20 overflow-hidden rounded-xl border border-border bg-background">
+                      <div className="h-16 w-16 overflow-hidden rounded-xl border border-border bg-background sm:h-20 sm:w-20">
                         {item.kind === "video" ? (
                           <video
                             src={item.previewUrl}
