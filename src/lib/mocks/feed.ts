@@ -139,7 +139,7 @@ export const feedPosts: FeedPost[] = [
       {
         id: "media-003-a",
         type: "video",
-        url: "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4",
+        url: "https://www.w3schools.com/html/mov_bbb.mp4",
         alt: "Piano recital clip",
         durationLabel: "01:12",
         taggedMembers: [
@@ -209,7 +209,7 @@ export const feedPosts: FeedPost[] = [
       {
         id: "media-004-b",
         type: "video",
-        url: "https://storage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
+        url: "https://www.w3schools.com/html/movie.mp4",
         alt: "Kids skipping stones at a lake",
         durationLabel: "00:34",
         taggedMembers: [
@@ -241,7 +241,7 @@ export const feedPosts: FeedPost[] = [
       {
         id: "media-004-d",
         type: "video",
-        url: "https://storage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4",
+        url: "https://www.w3schools.com/html/mov_bbb.mp4",
         alt: "Family walking along the shoreline",
         durationLabel: "00:41",
         taggedMembers: [
@@ -486,7 +486,7 @@ export const feedPosts: FeedPost[] = [
       {
         id: "media-009-c",
         type: "video",
-        url: "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4",
+        url: "https://www.w3schools.com/html/movie.mp4",
         alt: "Short clip of everyone packing up as the sun goes down",
         durationLabel: "00:27",
       },
@@ -527,7 +527,7 @@ export const feedPosts: FeedPost[] = [
       {
         id: "media-010-b",
         type: "video",
-        url: "https://storage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4",
+        url: "https://www.w3schools.com/html/mov_bbb.mp4",
         alt: "Quick video panning across the evening setup",
         durationLabel: "00:35",
       },
@@ -540,7 +540,7 @@ export const feedPosts: FeedPost[] = [
       {
         id: "media-010-d",
         type: "video",
-        url: "https://storage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
+        url: "https://www.w3schools.com/html/movie.mp4",
         alt: "Family laughing during dessert and toasts",
         durationLabel: "00:48",
       },
@@ -727,7 +727,7 @@ export const feedPosts: FeedPost[] = [
       {
         id: "media-016-a",
         type: "video",
-        url: "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4",
+        url: "https://www.w3schools.com/html/mov_bbb.mp4",
         alt: "Hands shaping clay on a pottery wheel",
         durationLabel: "00:45",
       },
@@ -839,7 +839,7 @@ export const feedPosts: FeedPost[] = [
       {
         id: "media-020-b",
         type: "video",
-        url: "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4",
+        url: "https://www.w3schools.com/html/movie.mp4",
         alt: "Street musician performing on a busy corner",
         durationLabel: "00:32",
       },
@@ -1002,7 +1002,7 @@ export const feedPosts: FeedPost[] = [
       {
         id: "media-026-b",
         type: "video",
-        url: "https://storage.googleapis.com/gtv-videos-bucket/sample/SubaruOutbackOnStreetAndDirt.mp4",
+        url: "https://www.w3schools.com/html/mov_bbb.mp4",
         alt: "Timelapse of Ava shaping a bowl on the wheel",
         durationLabel: "00:22",
       },

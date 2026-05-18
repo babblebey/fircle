@@ -24,6 +24,7 @@ export type MediaViewerItem = {
   type: "image" | "video";
   url: string;
   alt: string;
+  caption?: string;
   taggedMembers?: TaggedMember[];
 };
 
@@ -50,11 +51,17 @@ function MediaSlide({ item }: { item: MediaViewerItem }) {
         <video
           src={item.url}
           controls
-          className="max-h-full max-w-full rounded-lg"
+          className="max-h-full w-full max-w-full rounded-lg object-contain"
           aria-label={item.alt}
         />
 
         {item.taggedMembers?.length ? <TaggedMembersOverlay members={item.taggedMembers} /> : null}
+
+        {item.caption ? (
+          <p className="absolute bottom-2 left-2 max-w-[min(92vw,28rem)] rounded-xl border border-black/10 bg-white/75 px-3 py-2 text-sm text-foreground shadow-lg backdrop-blur-sm dark:border-white/10 dark:bg-black/60 dark:text-white">
+            {item.caption}
+          </p>
+        ) : null}
       </div>
     );
   }
@@ -68,13 +75,19 @@ function MediaSlide({ item }: { item: MediaViewerItem }) {
       />
 
       {item.taggedMembers?.length ? <TaggedMembersOverlay members={item.taggedMembers} /> : null}
+
+      {item.caption ? (
+        <p className="absolute bottom-2 left-2 max-w-[min(92vw,28rem)] rounded-xl border border-black/10 bg-white/75 px-3 py-2 text-sm text-foreground shadow-lg backdrop-blur-sm dark:border-white/10 dark:bg-black/60 dark:text-white">
+          {item.caption}
+        </p>
+      ) : null}
     </div>
   );
 }
 
 function TaggedMembersOverlay({ members }: { members: TaggedMember[] }) {
   return (
-    <div className="absolute bottom-14 left-2 max-w-[min(92vw,28rem)] rounded-2xl border border-black/10 dark:border-white/10 bg-white/70 dark:bg-black/55 px-3 py-2 text-foreground dark:text-white shadow-xl backdrop-blur-sm">
+    <div className="absolute bottom-16 left-2 max-w-[min(92vw,28rem)] rounded-2xl border border-black/10 dark:border-white/10 bg-white/70 dark:bg-black/55 px-3 py-2 text-foreground dark:text-white shadow-xl backdrop-blur-sm">
       <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-muted-foreground dark:text-white/60">
         Tagged in this media
       </p>

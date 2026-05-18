@@ -10,7 +10,6 @@ import { Button } from "~/components/ui/button";
 
 import { PostMediaGrid } from "./post-media-grid";
 import { TaggedMemberAvatarStack } from "./tagged-member-avatar-stack";
-import { PostMixedMediaStack } from "./post-mixed-media-stack";
 import { PostVideoCard } from "./post-video-card";
 import { MediaViewerDialog } from "./media-viewer-dialog";
 
@@ -19,6 +18,7 @@ type PostMediaItem = {
   type: "image" | "video";
   url: string;
   alt: string;
+  caption?: string;
   durationLabel?: string;
   taggedMembers?: { name: string; avatarUrl: string }[];
 };
@@ -103,7 +103,6 @@ export function PostCard({ post }: PostCardProps) {
 
   const imageItems = post.mediaItems.filter((item) => item.type === "image");
   const videoItems = post.mediaItems.filter((item) => item.type === "video");
-  const shouldUseMixedMediaStack = post.type === "mixed" && post.mediaItems.length > 4;
   const isClickable = !pathname?.startsWith("/post/");
 
   function navigateToPost() {
@@ -175,6 +174,8 @@ export function PostCard({ post }: PostCardProps) {
             <PostVideoCard
               key={item.id}
               title={item.alt}
+              caption={item.caption}
+              url={item.url}
               durationLabel={item.durationLabel}
               onClick={() => {
                 const globalIdx = post.mediaItems.findIndex((m) => m.id === item.id);
@@ -187,11 +188,7 @@ export function PostCard({ post }: PostCardProps) {
 
       {post.type === "mixed" ? (
         <div className="mt-3 space-y-2" onClick={(event) => event.stopPropagation()}>
-          {shouldUseMixedMediaStack ? (
-            <PostMixedMediaStack items={post.mediaItems} onItemClick={openViewer} />
-          ) : (
-            <PostMediaGrid items={post.mediaItems} onItemClick={openViewer} />
-          )}
+          <PostMediaGrid items={post.mediaItems} onItemClick={openViewer} />
         </div>
       ) : null}
 
