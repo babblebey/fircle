@@ -3,11 +3,11 @@
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
-import { ArrowLeft, Heart } from "~/components/ui/icons";
-import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
-import { Button } from "~/components/ui/button";
 import { PostCard } from "~/components/feed/post-card";
 import type { PostCardData } from "~/components/feed/post-card";
+import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
+import { Button } from "~/components/ui/button";
+import { ArrowLeft, Heart } from "~/components/ui/icons";
 import { api } from "~/trpc/react";
 
 type PostComment = {
@@ -38,10 +38,27 @@ function formatCreatedAtLabel(dateInput: Date | string) {
   return date.toLocaleDateString();
 }
 
+function formatFullPostTimestamp(dateInput: Date | string) {
+  const date = dateInput instanceof Date ? dateInput : new Date(dateInput);
+
+  const time = date.toLocaleTimeString(undefined, {
+    hour: "numeric",
+    minute: "2-digit",
+  });
+
+  const fullDate = date.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+
+  return `${time} · ${fullDate}`;
+}
+
 function mapPostToPostCardData(item: {
   id: string;
   type: "TEXT" | "PHOTO" | "VIDEO" | "MIXED";
-  author: { name: string; avatarUrl: string };
+  author: { name: string; slug: string; avatarUrl: string };
   createdAt: Date | string;
   caption: string | null;
   mediaItems: Array<{
@@ -58,6 +75,7 @@ function mapPostToPostCardData(item: {
     type: item.type.toLowerCase() as PostCardData["type"],
     author: {
       name: item.author.name,
+      slug: item.author.slug,
       avatarUrl: item.author.avatarUrl,
     },
     createdAtLabel: formatCreatedAtLabel(item.createdAt),
@@ -88,7 +106,6 @@ function getInitials(name: string) {
 function CommentCard({ comment }: { comment: PostComment }) {
   return (
     <article className="rounded-2xl border border-border/80 bg-card/90 px-4 py-3">
-      {/* Header: avatar + name + timestamp */}
       <header className="flex items-center gap-3">
         <Avatar className="size-9 shrink-0 border border-border">
           <AvatarImage src={comment.author.avatarUrl} alt={comment.author.name} />
@@ -96,32 +113,30 @@ function CommentCard({ comment }: { comment: PostComment }) {
             {getInitials(comment.author.name)}
           </AvatarFallback>
         </Avatar>
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-foreground leading-none">{comment.author.name}</p>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium leading-none text-foreground">{comment.author.name}</p>
           <p className="mt-0.5 text-xs text-muted-foreground">{comment.createdAtLabel}</p>
         </div>
       </header>
 
-      {/* Body */}
-      <p className="mt-3 text-foreground leading-relaxed">{comment.body}</p>
+      <p className="mt-3 leading-relaxed text-foreground">{comment.body}</p>
 
-      {/* Actions */}
       <div className="mt-3 flex items-center gap-2">
         <Button type="button" variant="ghost" size="sm" className="rounded-2xl px-3">
           <Heart className="size-4" />
           Like
-          {comment.reactionCount > 0 && (
+          {comment.reactionCount > 0 ? (
             <span className="rounded-full bg-muted px-1.5 py-0.5 text-xs tabular-nums text-muted-foreground">
               {comment.reactionCount}
             </span>
-          )}
+          ) : null}
         </Button>
       </div>
     </article>
   );
 }
 
-function CommentInput() {
+function CommentInput({ user }: { user?: { name: string; avatarUrl?: string } }) {
   const [value, setValue] = useState("");
   const [isFocused, setIsFocused] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -151,10 +166,13 @@ function CommentInput() {
       onSubmit={handleSubmit}
       className="flex items-center gap-3 rounded-2xl border border-border/80 bg-card/90 p-4"
     >
-      {/* Current user avatar placeholder */}
       <Avatar className="mb-auto mt-0.5 size-10 shrink-0 border border-border">
-        <AvatarFallback className="text-xs font-semibold text-foreground">ME</AvatarFallback>
+        {user?.avatarUrl ? <AvatarImage src={user.avatarUrl} alt={user.name} /> : null}
+        <AvatarFallback className="text-xs font-semibold text-foreground">
+          {user?.name ? getInitials(user.name) : "ME"}
+        </AvatarFallback>
       </Avatar>
+
       <div className="flex-1">
         <textarea
           ref={textareaRef}
@@ -164,7 +182,7 @@ function CommentInput() {
           onFocus={() => setIsFocused(true)}
           onBlur={() => setIsFocused(false)}
           placeholder="Post your reply"
-          className="pt-2.5 mt-0.5 min-h-6 w-full resize-none bg-transparent py-1 text-foreground leading-5 placeholder:text-muted-foreground outline-none"
+          className="mt-0.5 min-h-6 w-full resize-none bg-transparent py-1 pt-2.5 leading-5 text-foreground placeholder:text-muted-foreground outline-none"
         />
 
         {isExpanded ? (
@@ -207,6 +225,15 @@ export default function SinglePostPage() {
 
   const familyId = managementContext.data?.family?.id;
 
+  const memberProfileQuery = api.familyMember.getCurrentUserMemberProfile.useQuery(
+    { familyId: familyId ?? "" },
+    { enabled: Boolean(familyId) },
+  );
+
+  const currentUser = memberProfileQuery.data
+    ? { name: memberProfileQuery.data.name, avatarUrl: memberProfileQuery.data.image ?? undefined }
+    : undefined;
+
   const postQuery = api.post.getById.useQuery(
     {
       familyId: familyId ?? "",
@@ -220,6 +247,9 @@ export default function SinglePostPage() {
   );
 
   const post = postQuery.data ? mapPostToPostCardData(postQuery.data) : undefined;
+  const fullPostTimestamp = postQuery.data
+    ? formatFullPostTimestamp(postQuery.data.createdAt)
+    : undefined;
   const comments: PostComment[] = [];
 
   const isLoading = managementContext.isLoading || (Boolean(familyId) && postQuery.isLoading);
@@ -248,15 +278,15 @@ export default function SinglePostPage() {
           type="button"
           variant="ghost"
           size="sm"
-          className="mb-6 -ml-1 rounded-2xl"
+          className="-ml-1 mb-6 rounded-2xl"
           onClick={() => router.back()}
         >
           <ArrowLeft className="size-4" />
           Back
         </Button>
         <div className="rounded-3xl border border-dashed border-border/80 bg-card/70 px-6 py-12 text-center">
-          <p className="font-semibold text-lg">No family membership found</p>
-          <p className="mt-1 text-muted-foreground text-sm">
+          <p className="text-lg font-semibold">No family membership found</p>
+          <p className="mt-1 text-sm text-muted-foreground">
             Join a family to view and comment on posts.
           </p>
         </div>
@@ -271,15 +301,15 @@ export default function SinglePostPage() {
           type="button"
           variant="ghost"
           size="sm"
-          className="mb-6 -ml-1 rounded-2xl"
+          className="-ml-1 mb-6 rounded-2xl"
           onClick={() => router.back()}
         >
           <ArrowLeft className="size-4" />
           Back
         </Button>
         <div className="rounded-3xl border border-border/80 bg-card/70 px-6 py-12 text-center">
-          <p className="font-semibold text-lg">Unable to load post</p>
-          <p className="mt-1 text-muted-foreground text-sm">{postQuery.error.message}</p>
+          <p className="text-lg font-semibold">Unable to load post</p>
+          <p className="mt-1 text-sm text-muted-foreground">{postQuery.error.message}</p>
           <Button type="button" className="mt-4" onClick={() => postQuery.refetch()}>
             Retry
           </Button>
@@ -295,15 +325,15 @@ export default function SinglePostPage() {
           type="button"
           variant="ghost"
           size="sm"
-          className="mb-6 -ml-1 rounded-2xl"
+          className="-ml-1 mb-6 rounded-2xl"
           onClick={() => router.back()}
         >
           <ArrowLeft className="size-4" />
           Back
         </Button>
         <div className="rounded-3xl border border-dashed border-border/80 bg-card/70 px-6 py-12 text-center">
-          <p className="font-semibold text-lg">Post not found</p>
-          <p className="mt-1 text-muted-foreground text-sm">
+          <p className="text-lg font-semibold">Post not found</p>
+          <p className="mt-1 text-sm text-muted-foreground">
             This post may have been removed or the link is incorrect.
           </p>
         </div>
@@ -313,29 +343,31 @@ export default function SinglePostPage() {
 
   return (
     <section className="mx-auto w-full max-w-2xl px-4 py-8 sm:px-6">
-      {/* Back */}
       <Button
         type="button"
         variant="ghost"
         size="sm"
-        className="mb-6 -ml-1 rounded-2xl"
+        className="-ml-1 mb-6 rounded-2xl"
         onClick={() => router.back()}
       >
         <ArrowLeft className="size-4" />
         Back
       </Button>
 
-      {/* Post */}
-      <PostCard post={post} />
-      
-      {/* Comment input */}
+      <PostCard
+        post={post}
+        showHeaderTimestamp={false}
+        footerMeta={fullPostTimestamp}
+        showActionsSeparator
+        currentMemberSlug={memberProfileQuery.data?.slug}
+      />
+
       <div className="mt-6">
-        <CommentInput />
+        <CommentInput user={currentUser} />
       </div>
 
-      {/* Comments */}
       <section className="mt-5" aria-label="Comments">
-        <h2 className="mb-4 text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+        <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
           {comments.length} {comments.length === 1 ? "Comment" : "Comments"}
         </h2>
 

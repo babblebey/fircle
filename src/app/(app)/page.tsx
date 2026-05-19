@@ -30,7 +30,7 @@ function formatCreatedAtLabel(dateInput: Date | string) {
 function mapFeedItemToPostCardData(item: {
   id: string;
   type: "TEXT" | "PHOTO" | "VIDEO" | "MIXED";
-  author: { name: string; avatarUrl: string };
+  author: { name: string; slug: string; avatarUrl: string };
   createdAt: Date | string;
   caption: string | null;
   mediaItems: Array<{
@@ -47,6 +47,7 @@ function mapFeedItemToPostCardData(item: {
     type: item.type.toLowerCase() as PostCardData["type"],
     author: {
       name: item.author.name,
+      slug: item.author.slug,
       avatarUrl: item.author.avatarUrl,
     },
     createdAtLabel: formatCreatedAtLabel(item.createdAt),
@@ -82,12 +83,12 @@ function FeedEmptyState() {
   );
 }
 
-function FeedList({ posts }: { posts: PostCardData[] }) {
+function FeedList({ posts, currentMemberSlug }: { posts: PostCardData[]; currentMemberSlug?: string }) {
   return (
     <ul className="space-y-3 pb-20 md:pb-8">
       {posts.map((post) => (
         <li key={post.id}>
-          <PostCard post={post} />
+          <PostCard post={post} currentMemberSlug={currentMemberSlug} />
         </li>
       ))}
     </ul>
@@ -128,6 +129,18 @@ export default function FeedPage() {
 
   const familyId = managementContext.data?.family?.id;
 
+  const memberQuery = api.familyMember.getCurrentUserMemberProfile.useQuery(
+    { familyId: familyId ?? "" },
+    { enabled: Boolean(familyId), retry: false, refetchOnWindowFocus: false },
+  );
+
+  const currentUser = memberQuery.data
+    ? {
+        name: memberQuery.data.name,
+        avatarUrl: memberQuery.data.image ?? undefined,
+      }
+    : undefined;
+
   const feedQuery = api.post.getFeed.useQuery(
     {
       familyId: familyId ?? "",
@@ -160,7 +173,7 @@ export default function FeedPage() {
           </header>
 
           <div className="supports-backdrop-filter:bg-background/80 sticky top-0 z-20 -mx-1 rounded-3xl bg-background/95 px-1 pb-2 pt-1 backdrop-blur">
-            <ComposerEntry onOpenComposer={openComposer} />
+            <ComposerEntry user={currentUser} onOpenComposer={openComposer} />
           </div>
 
           {hasNoFamily ? (
@@ -183,7 +196,7 @@ export default function FeedPage() {
               </Button>
             </section>
           ) : posts.length > 0 ? (
-            <FeedList posts={posts} />
+            <FeedList posts={posts} currentMemberSlug={memberQuery.data?.slug} />
           ) : (
             <FeedEmptyState />
           )}

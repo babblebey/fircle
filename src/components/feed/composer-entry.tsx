@@ -1,20 +1,36 @@
 import { ImagePlus, Video } from "~/components/ui/icons";
 
-import { Avatar, AvatarFallback } from "~/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import { Button } from "~/components/ui/button";
 
 export type ComposerOpenMode = "photo" | "video";
 
 type ComposerEntryProps = {
+  user?: {
+    name: string;
+    avatarUrl?: string;
+  };
   onOpenComposer?: (mode?: ComposerOpenMode) => void;
 };
 
-export function ComposerEntry({ onOpenComposer }: ComposerEntryProps) {
+function getInitials(name: string) {
+  return name
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? "")
+    .join("");
+}
+
+export function ComposerEntry({ user, onOpenComposer }: ComposerEntryProps) {
   return (
     <section className="rounded-3xl border border-border/80 bg-card/90 p-4 shadow-sm">
       <div className="flex items-start gap-3">
-        <Avatar className="size-10 shrink-0 border border-border" aria-hidden>
-          <AvatarFallback className="text-sm font-semibold text-foreground">Y</AvatarFallback>
+        <Avatar className="size-10 shrink-0 border border-border" aria-label={user?.name ?? "Current user"}>
+          {user?.avatarUrl ? <AvatarImage src={user.avatarUrl} alt={user.name} /> : null}
+          <AvatarFallback className="text-sm font-semibold text-foreground">
+            {user?.name ? getInitials(user.name) : "ME"}
+          </AvatarFallback>
         </Avatar>
 
         <div className="flex min-w-0 flex-1 flex-col gap-3">
