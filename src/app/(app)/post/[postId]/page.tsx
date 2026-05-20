@@ -61,6 +61,8 @@ function mapPostToPostCardData(item: {
   author: { name: string; slug: string; avatarUrl: string };
   createdAt: Date | string;
   caption: string | null;
+  likedByCurrentUser?: boolean;
+  reactionCount?: number;
   mediaItems: Array<{
     id: string;
     type: string;
@@ -89,7 +91,8 @@ function mapPostToPostCardData(item: {
       durationLabel: media.durationLabel,
     })),
     taggedMembers: [],
-    reactionCount: 0,
+    likedByCurrentUser: item.likedByCurrentUser ?? false,
+    reactionCount: item.reactionCount ?? 0,
     commentCount: 0,
   };
 }
@@ -360,6 +363,7 @@ export default function SinglePostPage() {
         footerMeta={fullPostTimestamp}
         showActionsSeparator
         currentMemberSlug={memberProfileQuery.data?.slug}
+        familyId={familyId}
       />
 
       <div className="mt-6">

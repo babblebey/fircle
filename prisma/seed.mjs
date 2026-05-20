@@ -484,11 +484,67 @@ async function main() {
     postsSeeded++;
   }
 
+  // ── Post Likes ─────────────────────────────────────────────────────────────
+
+  const seededPosts = await db.post.findMany({
+    where: {
+      authorMember: {
+        familyId: family.id,
+      },
+    },
+    select: {
+      id: true,
+      authorMemberId: true,
+      createdAt: true,
+    },
+    orderBy: [
+      { createdAt: "desc" },
+      { id: "asc" },
+    ],
+  });
+
+  const memberIds = Array.from(memberIdByName.values()).sort();
+
+  // Make likes deterministic and idempotent: reset likes for seeded posts, then recreate.
+  await db.postLike.deleteMany({
+    where: {
+      postId: {
+        in: seededPosts.map((post) => post.id),
+      },
+    },
+  });
+
+  const likesToCreate = [];
+
+  for (let postIndex = 0; postIndex < seededPosts.length; postIndex += 1) {
+    const post = seededPosts[postIndex];
+
+    for (let memberIndex = 0; memberIndex < memberIds.length; memberIndex += 1) {
+      const memberId = memberIds[memberIndex];
+      const shouldLike = (postIndex + memberIndex) % 2 === 0;
+
+      if (!shouldLike) continue;
+
+      likesToCreate.push({
+        postId: post.id,
+        memberIdWhoLiked: memberId,
+      });
+    }
+  }
+
+  if (likesToCreate.length > 0) {
+    await db.postLike.createMany({
+      data: likesToCreate,
+      skipDuplicates: true,
+    });
+  }
+
   console.log("Seed complete");
   console.log(`Family: ${family.name} (${family.id})`);
   console.log(`Users seeded: ${usersFromMocks.length + 1}`);
   console.log(`Invites seeded: ${inviteFixtures.length}`);
   console.log(`Posts seeded: ${postsSeeded}`);
+  console.log(`Post likes seeded: ${likesToCreate.length}`);
   console.log(`Seed sign-in password for all users: ${SEED_PASSWORD}`);
 }
 

@@ -33,6 +33,8 @@ function mapFeedItemToPostCardData(item: {
   author: { name: string; slug: string; avatarUrl: string };
   createdAt: Date | string;
   caption: string | null;
+  likedByCurrentUser?: boolean;
+  reactionCount?: number;
   mediaItems: Array<{
     id: string;
     type: string;
@@ -61,7 +63,8 @@ function mapFeedItemToPostCardData(item: {
       durationLabel: media.durationLabel,
     })),
     taggedMembers: [],
-    reactionCount: 0,
+    likedByCurrentUser: item.likedByCurrentUser ?? false,
+    reactionCount: item.reactionCount ?? 0,
     commentCount: 0,
   };
 }
@@ -83,12 +86,20 @@ function FeedEmptyState() {
   );
 }
 
-function FeedList({ posts, currentMemberSlug }: { posts: PostCardData[]; currentMemberSlug?: string }) {
+function FeedList({
+  posts,
+  currentMemberSlug,
+  familyId,
+}: {
+  posts: PostCardData[];
+  currentMemberSlug?: string;
+  familyId?: string;
+}) {
   return (
     <ul className="space-y-3 pb-20 md:pb-8">
       {posts.map((post) => (
         <li key={post.id}>
-          <PostCard post={post} currentMemberSlug={currentMemberSlug} />
+          <PostCard post={post} currentMemberSlug={currentMemberSlug} familyId={familyId} />
         </li>
       ))}
     </ul>
@@ -196,7 +207,11 @@ export default function FeedPage() {
               </Button>
             </section>
           ) : posts.length > 0 ? (
-            <FeedList posts={posts} currentMemberSlug={memberQuery.data?.slug} />
+            <FeedList
+              posts={posts}
+              currentMemberSlug={memberQuery.data?.slug}
+              familyId={familyId}
+            />
           ) : (
             <FeedEmptyState />
           )}

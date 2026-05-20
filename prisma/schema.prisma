@@ -68,6 +68,7 @@ model FamilyMember {
   updatedAt DateTime   @updatedAt
   claimInvites Invite[] @relation("ClaimMemberInvites")
   posts     Post[]
+  postLikes PostLike[]
 
   family Family @relation(fields: [familyId], references: [id], onDelete: Cascade)
   user   User?  @relation(fields: [userId], references: [id], onDelete: SetNull)
@@ -114,6 +115,7 @@ model Post {
   updatedAt      DateTime    @updatedAt
   authorMember   FamilyMember @relation(fields: [authorMemberId], references: [id], onDelete: Cascade)
   media          PostMedia[]
+  likes          PostLike[]
 
   @@index([authorMemberId])
   @@index([createdAt])
@@ -142,6 +144,20 @@ model PostMedia {
   @@index([sortOrder])
   @@index([createdAt])
   @@index([postId, sortOrder])
+}
+
+model PostLike {
+  id               String        @id @default(cuid())
+  postId           String
+  memberIdWhoLiked String
+  createdAt        DateTime      @default(now())
+
+  post             Post          @relation(fields: [postId], references: [id], onDelete: Cascade)
+  memberWhoLiked   FamilyMember  @relation(fields: [memberIdWhoLiked], references: [id], onDelete: Cascade)
+
+  @@unique([postId, memberIdWhoLiked])
+  @@index([postId])
+  @@index([memberIdWhoLiked])
 }
 
 // Necessary for Next auth

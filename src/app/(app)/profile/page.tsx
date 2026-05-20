@@ -87,7 +87,8 @@ export default function ProfilePage() {
       durationLabel: m.durationLabel,
     })),
     taggedMembers: [],
-    reactionCount: 0,
+    likedByCurrentUser: item.likedByCurrentUser,
+    reactionCount: item.reactionCount,
     commentCount: 0,
   }));
 
@@ -136,7 +137,12 @@ export default function ProfilePage() {
                   {memberPosts.length > 0 ? (
                     <div className="space-y-4">
                       {memberPosts.map((post) => (
-                        <PostCard key={post.id} post={post} currentMemberSlug={member?.slug} />
+                        <PostCard
+                          key={post.id}
+                          post={post}
+                          currentMemberSlug={member?.slug}
+                          familyId={familyId}
+                        />
                       ))}
                     </div>
                   ) : (
@@ -154,7 +160,12 @@ export default function ProfilePage() {
                   {taggedPosts.length > 0 ? (
                     <div className="space-y-4">
                       {taggedPosts.map((post) => (
-                        <PostCard key={post.id} post={post} currentMemberSlug={member?.slug} />
+                        <PostCard
+                          key={post.id}
+                          post={post}
+                          currentMemberSlug={member?.slug}
+                          familyId={familyId}
+                        />
                       ))}
                     </div>
                   ) : (
@@ -172,7 +183,12 @@ export default function ProfilePage() {
                   {likedPosts.length > 0 ? (
                     <div className="space-y-4">
                       {likedPosts.map((post) => (
-                        <PostCard key={post.id} post={post} currentMemberSlug={member?.slug} />
+                        <PostCard
+                          key={post.id}
+                          post={post}
+                          currentMemberSlug={member?.slug}
+                          familyId={familyId}
+                        />
                       ))}
                     </div>
                   ) : (

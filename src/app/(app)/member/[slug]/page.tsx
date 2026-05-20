@@ -120,7 +120,8 @@ export default function MemberProfilePage() {
       durationLabel: m.durationLabel,
     })),
     taggedMembers: [],
-    reactionCount: 0,
+    likedByCurrentUser: item.likedByCurrentUser,
+    reactionCount: item.reactionCount,
     commentCount: 0,
   }));
 
@@ -182,7 +183,12 @@ export default function MemberProfilePage() {
                   {memberPosts.length > 0 ? (
                     <div className="space-y-4">
                       {memberPosts.map((post) => (
-                        <PostCard key={post.id} post={post} currentMemberSlug={currentUserQuery.data?.slug} />
+                        <PostCard
+                          key={post.id}
+                          post={post}
+                          currentMemberSlug={currentUserQuery.data?.slug}
+                          familyId={familyId}
+                        />
                       ))}
                     </div>
                   ) : (
@@ -200,7 +206,12 @@ export default function MemberProfilePage() {
                   {taggedPosts.length > 0 ? (
                     <div className="space-y-4">
                       {taggedPosts.map((post) => (
-                        <PostCard key={post.id} post={post} currentMemberSlug={currentUserQuery.data?.slug} />
+                        <PostCard
+                          key={post.id}
+                          post={post}
+                          currentMemberSlug={currentUserQuery.data?.slug}
+                          familyId={familyId}
+                        />
                       ))}
                     </div>
                   ) : (
@@ -218,7 +229,12 @@ export default function MemberProfilePage() {
                   {likedPosts.length > 0 ? (
                     <div className="space-y-4">
                       {likedPosts.map((post) => (
-                        <PostCard key={post.id} post={post} currentMemberSlug={currentUserQuery.data?.slug} />
+                        <PostCard
+                          key={post.id}
+                          post={post}
+                          currentMemberSlug={currentUserQuery.data?.slug}
+                          familyId={familyId}
+                        />
                       ))}
                     </div>
                   ) : (

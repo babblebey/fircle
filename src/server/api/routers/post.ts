@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { getStorageProvider } from "~/server/storage";
+import { checkRateLimit } from "~/lib/rate-limit";
 
 import {
   createTRPCRouter,
@@ -101,6 +102,11 @@ export const getPostsByMemberInputSchema = z.object({
 });
 
 export const getPostByIdInputSchema = z.object({
+  familyId: z.string().cuid(),
+  postId: z.string().cuid(),
+});
+
+export const toggleLikeInputSchema = z.object({
   familyId: z.string().cuid(),
   postId: z.string().cuid(),
 });
@@ -247,6 +253,8 @@ function mapPostResponse(post: {
   caption: string | null;
   createdAt: Date;
   authorMember: { id: string; name: string; slug: string; image: string | null };
+  likes: Array<{ id: string }>;
+  _count: { likes: number };
   media: Array<{
     id: string;
     type: "IMAGE" | "VIDEO";
@@ -280,7 +288,8 @@ function mapPostResponse(post: {
     media: post.media.map((media) => mapMediaRecord(media)),
     mediaItems: post.media.map((media) => mapFeedMediaItem(media)),
     taggedMembers: [],
-    reactionCount: 0,
+    likedByCurrentUser: post.likes.length > 0,
+    reactionCount: post._count.likes,
     commentCount: 0,
   };
 }
@@ -384,6 +393,19 @@ export const postRouter = createTRPCRouter({
                 createdAt: true,
               },
             },
+            likes: {
+              where: {
+                memberIdWhoLiked: membership.id,
+              },
+              select: {
+                id: true,
+              },
+            },
+            _count: {
+              select: {
+                likes: true,
+              },
+            },
           },
         });
 
@@ -401,7 +423,7 @@ export const postRouter = createTRPCRouter({
   getById: protectedProcedure
     .input(getPostByIdInputSchema)
     .query(async ({ ctx, input }) => {
-      await requireFamilyMembership(input.familyId, ctx.session.user.id, ctx.db);
+      const membership = await requireFamilyMembership(input.familyId, ctx.session.user.id, ctx.db);
 
       const post = await ctx.db.post.findFirst({
         where: {
@@ -442,6 +464,19 @@ export const postRouter = createTRPCRouter({
               createdAt: true,
             },
           },
+          likes: {
+            where: {
+              memberIdWhoLiked: membership.id,
+            },
+            select: {
+              id: true,
+            },
+          },
+          _count: {
+            select: {
+              likes: true,
+            },
+          },
         },
       });
 
@@ -453,7 +488,7 @@ export const postRouter = createTRPCRouter({
     }),
 
   getFeed: protectedProcedure.input(getFeedInputSchema).query(async ({ ctx, input }) => {
-    await requireFamilyMembership(input.familyId, ctx.session.user.id, ctx.db);
+    const membership = await requireFamilyMembership(input.familyId, ctx.session.user.id, ctx.db);
 
     const cursor = parseCursor(input.cursor);
 
@@ -514,6 +549,19 @@ export const postRouter = createTRPCRouter({
             createdAt: true,
           },
         },
+        likes: {
+          where: {
+            memberIdWhoLiked: membership.id,
+          },
+          select: {
+            id: true,
+          },
+        },
+        _count: {
+          select: {
+            likes: true,
+          },
+        },
       },
     });
 
@@ -535,7 +583,7 @@ export const postRouter = createTRPCRouter({
   getPostsByMember: protectedProcedure
     .input(getPostsByMemberInputSchema)
     .query(async ({ ctx, input }) => {
-      await requireFamilyMembership(input.familyId, ctx.session.user.id, ctx.db);
+      const membership = await requireFamilyMembership(input.familyId, ctx.session.user.id, ctx.db);
 
       const cursor = parseCursor(input.cursor);
 
@@ -588,6 +636,19 @@ export const postRouter = createTRPCRouter({
               createdAt: true,
             },
           },
+          likes: {
+            where: {
+              memberIdWhoLiked: membership.id,
+            },
+            select: {
+              id: true,
+            },
+          },
+          _count: {
+            select: {
+              likes: true,
+            },
+          },
         },
       });
 
@@ -604,5 +665,83 @@ export const postRouter = createTRPCRouter({
         items: items.map((post) => mapPostResponse(post)),
         nextCursor,
       };
+    }),
+
+  toggleLike: protectedProcedure
+    .input(toggleLikeInputSchema)
+    .mutation(async ({ ctx, input }) => {
+      const membership = await requireFamilyMembership(input.familyId, ctx.session.user.id, ctx.db);
+
+      const rateLimit = checkRateLimit(`post:like:${membership.id}`, 100, 60_000);
+      if (!rateLimit.ok) {
+        throw new TRPCError({
+          code: "TOO_MANY_REQUESTS",
+          message: "Too many requests. Please try again later.",
+        });
+      }
+
+      const post = await ctx.db.post.findFirst({
+        where: {
+          id: input.postId,
+          authorMember: {
+            familyId: input.familyId,
+          },
+        },
+        select: {
+          id: true,
+        },
+      });
+
+      if (!post) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Post not found",
+        });
+      }
+
+      const result = await ctx.db.$transaction(async (tx) => {
+        const existingLike = await tx.postLike.findUnique({
+          where: {
+            postId_memberIdWhoLiked: {
+              postId: post.id,
+              memberIdWhoLiked: membership.id,
+            },
+          },
+          select: {
+            id: true,
+          },
+        });
+
+        let likedByCurrentUser = false;
+        if (existingLike) {
+          await tx.postLike.delete({
+            where: {
+              id: existingLike.id,
+            },
+          });
+        } else {
+          await tx.postLike.create({
+            data: {
+              postId: post.id,
+              memberIdWhoLiked: membership.id,
+            },
+          });
+          likedByCurrentUser = true;
+        }
+
+        const reactionCount = await tx.postLike.count({
+          where: {
+            postId: post.id,
+          },
+        });
+
+        return {
+          postId: post.id,
+          likedByCurrentUser,
+          reactionCount,
+        };
+      });
+
+      return result;
     }),
 });

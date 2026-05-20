@@ -1,4 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
+import * as rateLimit from "~/lib/rate-limit";
 
 vi.mock("~/server/auth", () => ({
   auth: vi.fn(),
@@ -58,7 +59,12 @@ describe("postRouter.create", () => {
       authorMember: {
         id: "member-1",
         name: "Parent One",
+        slug: "parent-one",
         image: null,
+      },
+      likes: [],
+      _count: {
+        likes: 0,
       },
       media: [
         {
@@ -183,6 +189,8 @@ describe("postRouter.create", () => {
     expect(result.media).toHaveLength(2);
     expect(result.media[0]?.url).toContain("/api/media/r2/");
     expect(result.mediaItems[1]?.durationLabel).toBe("01:04");
+    expect(result.reactionCount).toBe(0);
+    expect(result.likedByCurrentUser).toBe(false);
   });
 
   it("rejects users without family membership", async () => {
@@ -210,6 +218,233 @@ describe("postRouter.create", () => {
       }),
     ).rejects.toMatchObject({
       code: "FORBIDDEN",
+    });
+  });
+});
+
+describe("postRouter.toggleLike", () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  const familyId = "clh0000000000000000000002";
+  const postId = "clh0000000000000000000003";
+
+  it("creates a like when none exists", async () => {
+    vi.spyOn(rateLimit, "checkRateLimit").mockReturnValue({ ok: true });
+
+    const familyMemberFindUnique = vi.fn().mockResolvedValue({
+      id: "member-1",
+      familyId,
+      name: "Parent One",
+      image: null,
+    });
+
+    const postFindFirst = vi.fn().mockResolvedValue({ id: "post-1" });
+    const postLikeFindUnique = vi.fn().mockResolvedValue(null);
+    const postLikeCreate = vi.fn().mockResolvedValue({ id: "like-1" });
+    const postLikeDelete = vi.fn();
+    const postLikeCount = vi.fn().mockResolvedValue(4);
+
+    const tx = {
+      postLike: {
+        findUnique: postLikeFindUnique,
+        create: postLikeCreate,
+        delete: postLikeDelete,
+        count: postLikeCount,
+      },
+    };
+
+    const db = {
+      familyMember: {
+        findUnique: familyMemberFindUnique,
+      },
+      post: {
+        findFirst: postFindFirst,
+      },
+      $transaction: vi.fn(async (callback: (txArg: typeof tx) => Promise<unknown>) => callback(tx)),
+    } as never;
+
+    const caller = postRouter.createCaller({
+      db,
+      session: {
+        user: { id: "user-1" },
+      },
+      headers: new Headers(),
+    } as never);
+
+    const result = await caller.toggleLike({
+      familyId,
+      postId,
+    });
+
+    expect(postLikeCreate).toHaveBeenCalledWith({
+      data: {
+        postId: "post-1",
+        memberIdWhoLiked: "member-1",
+      },
+    });
+    expect(postLikeDelete).not.toHaveBeenCalled();
+    expect(result).toEqual({
+      postId: "post-1",
+      likedByCurrentUser: true,
+      reactionCount: 4,
+    });
+  });
+
+  it("removes an existing like", async () => {
+    vi.spyOn(rateLimit, "checkRateLimit").mockReturnValue({ ok: true });
+
+    const db = {
+      familyMember: {
+        findUnique: vi.fn().mockResolvedValue({
+          id: "member-1",
+          familyId,
+          name: "Parent One",
+          image: null,
+        }),
+      },
+      post: {
+        findFirst: vi.fn().mockResolvedValue({ id: "post-1" }),
+      },
+      $transaction: vi.fn(async (callback: (txArg: {
+        postLike: {
+          findUnique: ReturnType<typeof vi.fn>;
+          create: ReturnType<typeof vi.fn>;
+          delete: ReturnType<typeof vi.fn>;
+          count: ReturnType<typeof vi.fn>;
+        };
+      }) => Promise<unknown>) =>
+        callback({
+          postLike: {
+            findUnique: vi.fn().mockResolvedValue({ id: "like-1" }),
+            create: vi.fn(),
+            delete: vi.fn().mockResolvedValue({ id: "like-1" }),
+            count: vi.fn().mockResolvedValue(2),
+          },
+        })),
+    } as never;
+
+    const caller = postRouter.createCaller({
+      db,
+      session: {
+        user: { id: "user-1" },
+      },
+      headers: new Headers(),
+    } as never);
+
+    const result = await caller.toggleLike({
+      familyId,
+      postId,
+    });
+
+    expect(result).toEqual({
+      postId: "post-1",
+      likedByCurrentUser: false,
+      reactionCount: 2,
+    });
+  });
+
+  it("rejects users without family membership", async () => {
+    vi.spyOn(rateLimit, "checkRateLimit").mockReturnValue({ ok: true });
+
+    const db = {
+      familyMember: {
+        findUnique: vi.fn().mockResolvedValue(null),
+      },
+      post: {
+        findFirst: vi.fn(),
+      },
+      $transaction: vi.fn(),
+    } as never;
+
+    const caller = postRouter.createCaller({
+      db,
+      session: {
+        user: { id: "user-1" },
+      },
+      headers: new Headers(),
+    } as never);
+
+    await expect(
+      caller.toggleLike({
+        familyId,
+        postId,
+      }),
+    ).rejects.toMatchObject({
+      code: "FORBIDDEN",
+    });
+  });
+
+  it("rejects when post is not in the family", async () => {
+    vi.spyOn(rateLimit, "checkRateLimit").mockReturnValue({ ok: true });
+
+    const db = {
+      familyMember: {
+        findUnique: vi.fn().mockResolvedValue({
+          id: "member-1",
+          familyId,
+          name: "Parent One",
+          image: null,
+        }),
+      },
+      post: {
+        findFirst: vi.fn().mockResolvedValue(null),
+      },
+      $transaction: vi.fn(),
+    } as never;
+
+    const caller = postRouter.createCaller({
+      db,
+      session: {
+        user: { id: "user-1" },
+      },
+      headers: new Headers(),
+    } as never);
+
+    await expect(
+      caller.toggleLike({
+        familyId,
+        postId,
+      }),
+    ).rejects.toMatchObject({
+      code: "NOT_FOUND",
+    });
+  });
+
+  it("enforces rate limits", async () => {
+    vi.spyOn(rateLimit, "checkRateLimit").mockReturnValue({ ok: false, retryAfterMs: 1000 });
+
+    const db = {
+      familyMember: {
+        findUnique: vi.fn().mockResolvedValue({
+          id: "member-1",
+          familyId,
+          name: "Parent One",
+          image: null,
+        }),
+      },
+      post: {
+        findFirst: vi.fn(),
+      },
+      $transaction: vi.fn(),
+    } as never;
+
+    const caller = postRouter.createCaller({
+      db,
+      session: {
+        user: { id: "user-1" },
+      },
+      headers: new Headers(),
+    } as never);
+
+    await expect(
+      caller.toggleLike({
+        familyId,
+        postId,
+      }),
+    ).rejects.toMatchObject({
+      code: "TOO_MANY_REQUESTS",
     });
   });
 });
