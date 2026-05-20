@@ -494,6 +494,7 @@ async function main() {
     },
     select: {
       id: true,
+      caption: true,
       authorMemberId: true,
       createdAt: true,
     },
@@ -539,12 +540,203 @@ async function main() {
     });
   }
 
+  // ── Comments ───────────────────────────────────────────────────────────────
+
+  const postIdByCaption = new Map(
+    seededPosts.map((post) => [post.caption ?? "", post.id]),
+  );
+
+  const commentFixtures = [
+    {
+      key: "lily-results-emma",
+      postCaption:
+        "Just got my exam results back — passed with distinction! Couldn't have done it without the support from this whole family 🎉",
+      authorName: "Emma Shittabey",
+      content: "You worked for this. We are all ridiculously proud of you.",
+      createdAt: new Date(now - 28 * 60 * 1000),
+    },
+    {
+      key: "lily-results-noah",
+      postCaption:
+        "Just got my exam results back — passed with distinction! Couldn't have done it without the support from this whole family 🎉",
+      authorName: "Noah Shittabey",
+      content: "Distinction deserves celebratory pancakes this weekend.",
+      createdAt: new Date(now - 26 * 60 * 1000),
+    },
+    {
+      key: "game-night-noah",
+      postCaption:
+        "Family game night is back on this Friday! @Noah Shittabey please don't forget the snacks this time 😅",
+      authorName: "Noah Shittabey",
+      content: "The snacks are already on the shopping list. No promises about my card strategy though.",
+      createdAt: new Date(now - 50 * 60 * 1000),
+    },
+    {
+      key: "barbecue-emma",
+      postCaption:
+        "Anyone up for a barbecue this weekend? I'm thinking Sunday afternoon. @Noah Shittabey already volunteered to man the grill.",
+      authorName: "Emma Shittabey",
+      content: "Sunday works for me. I'll bring the salad and lemonade.",
+      createdAt: new Date(now - 3 * 60 * 60 * 1000 + 10 * 60 * 1000),
+    },
+    {
+      key: "barbecue-ava",
+      postCaption:
+        "Anyone up for a barbecue this weekend? I'm thinking Sunday afternoon. @Noah Shittabey already volunteered to man the grill.",
+      authorName: "Ava Kim",
+      content: "Count me in. I can bring dessert if no one has claimed it yet.",
+      createdAt: new Date(now - 3 * 60 * 60 * 1000 + 18 * 60 * 1000),
+    },
+    {
+      key: "pottery-lily-emma",
+      postCaption:
+        "Pottery class recap! @Lily Shittabey this was such a fun idea. We're definitely going back.",
+      authorName: "Emma Shittabey",
+      content: "Next time I want a full family pottery leaderboard.",
+      createdAt: new Date(now - 2 * 24 * 60 * 60 * 1000 + 30 * 60 * 1000),
+    },
+    {
+      key: "lily-results-ava-reply",
+      postCaption:
+        "Just got my exam results back — passed with distinction! Couldn't have done it without the support from this whole family 🎉",
+      authorName: "Ava Kim",
+      content: "Pancakes and a framed printout of the result, honestly.",
+      parentKey: "lily-results-noah",
+      createdAt: new Date(now - 24 * 60 * 1000),
+    },
+    {
+      key: "game-night-emma-reply",
+      postCaption:
+        "Family game night is back on this Friday! @Noah Shittabey please don't forget the snacks this time 😅",
+      authorName: "Emma Shittabey",
+      content: "Documenting this promise so we can all refer back to it later.",
+      parentKey: "game-night-noah",
+      createdAt: new Date(now - 46 * 60 * 1000),
+    },
+    {
+      key: "barbecue-logan-reply",
+      postCaption:
+        "Anyone up for a barbecue this weekend? I'm thinking Sunday afternoon. @Noah Shittabey already volunteered to man the grill.",
+      authorName: "Logan Ross",
+      content: "Dessert is officially yours. I'll handle the music and chairs.",
+      parentKey: "barbecue-ava",
+      createdAt: new Date(now - 3 * 60 * 60 * 1000 + 24 * 60 * 1000),
+    },
+    {
+      key: "pottery-lily-reply",
+      postCaption:
+        "Pottery class recap! @Lily Shittabey this was such a fun idea. We're definitely going back.",
+      authorName: "Lily Shittabey",
+      content: "Only if we agree not to compare our wobbly bowls afterward.",
+      parentKey: "pottery-lily-emma",
+      createdAt: new Date(now - 2 * 24 * 60 * 60 * 1000 + 45 * 60 * 1000),
+    },
+  ];
+
+  await db.commentLike.deleteMany({
+    where: {
+      comment: {
+        postId: {
+          in: seededPosts.map((post) => post.id),
+        },
+      },
+    },
+  });
+
+  await db.comment.deleteMany({
+    where: {
+      postId: {
+        in: seededPosts.map((post) => post.id),
+      },
+    },
+  });
+
+  const commentIdByKey = new Map();
+
+  for (const fixture of commentFixtures) {
+    const postId = postIdByCaption.get(fixture.postCaption);
+    const authorMemberId = memberIdByName.get(fixture.authorName);
+    const parentCommentId = fixture.parentKey
+      ? commentIdByKey.get(fixture.parentKey)
+      : null;
+
+    if (!postId || !authorMemberId) {
+      continue;
+    }
+
+    if (fixture.parentKey && !parentCommentId) {
+      continue;
+    }
+
+    const comment = await db.comment.create({
+      data: {
+        postId,
+        authorMemberId,
+        parentCommentId,
+        content: fixture.content,
+        createdAt: fixture.createdAt,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    commentIdByKey.set(fixture.key, comment.id);
+  }
+
+  const seededComments = await db.comment.findMany({
+    where: {
+      postId: {
+        in: seededPosts.map((post) => post.id),
+      },
+    },
+    select: {
+      id: true,
+      authorMemberId: true,
+      createdAt: true,
+    },
+    orderBy: [
+      { createdAt: "asc" },
+      { id: "asc" },
+    ],
+  });
+
+  const commentLikesToCreate = [];
+
+  for (let commentIndex = 0; commentIndex < seededComments.length; commentIndex += 1) {
+    const comment = seededComments[commentIndex];
+
+    for (let memberIndex = 0; memberIndex < memberIds.length; memberIndex += 1) {
+      const memberId = memberIds[memberIndex];
+      const shouldLike =
+        memberId !== comment.authorMemberId && (commentIndex + memberIndex) % 3 === 0;
+
+      if (!shouldLike) {
+        continue;
+      }
+
+      commentLikesToCreate.push({
+        commentId: comment.id,
+        memberIdWhoLiked: memberId,
+      });
+    }
+  }
+
+  if (commentLikesToCreate.length > 0) {
+    await db.commentLike.createMany({
+      data: commentLikesToCreate,
+      skipDuplicates: true,
+    });
+  }
+
   console.log("Seed complete");
   console.log(`Family: ${family.name} (${family.id})`);
   console.log(`Users seeded: ${usersFromMocks.length + 1}`);
   console.log(`Invites seeded: ${inviteFixtures.length}`);
   console.log(`Posts seeded: ${postsSeeded}`);
   console.log(`Post likes seeded: ${likesToCreate.length}`);
+  console.log(`Comments seeded: ${seededComments.length}`);
+  console.log(`Comment likes seeded: ${commentLikesToCreate.length}`);
   console.log(`Seed sign-in password for all users: ${SEED_PASSWORD}`);
 }
 
