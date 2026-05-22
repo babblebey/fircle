@@ -22,7 +22,6 @@ const memberFilters: Array<{ label: string; value: MemberFilter }> = [
 export default function MembersPage() {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<MemberFilter>("all");
-  const [showEmptyPreview, setShowEmptyPreview] = useState(false);
 
   const managementContext = api.invite.getManagementContext.useQuery(undefined, {
     retry: false,
@@ -75,7 +74,7 @@ export default function MembersPage() {
     });
   }, [filter, members, query]);
 
-  const visibleMembers = showEmptyPreview ? [] : filteredMembers;
+  const visibleMembers = filteredMembers;
   const isLoading = managementContext.isLoading || membersQuery.isLoading;
 
   return (
@@ -104,14 +103,6 @@ export default function MembersPage() {
             aria-label="Search family members"
             className="sm:max-w-md"
           />
-
-          <Button
-            variant="ghost"
-            onClick={() => setShowEmptyPreview((current) => !current)}
-            type="button"
-          >
-            {showEmptyPreview ? "Hide empty-state preview" : "Preview empty state"}
-          </Button>
         </div>
 
         <div className="flex flex-wrap gap-2">
