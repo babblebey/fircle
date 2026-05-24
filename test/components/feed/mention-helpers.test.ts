@@ -7,7 +7,7 @@ import {
   normalizeMentionsForSubmit,
   reconcileMentionsOnTextChange,
   type MentionDraft,
-} from "./mention-helpers";
+} from "~/components/feed/mention-helpers";
 
 describe("getActiveMentionQuery", () => {
   it("returns active query for trailing @token at caret", () => {

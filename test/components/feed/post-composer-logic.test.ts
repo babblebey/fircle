@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { canPublishComposerPost, resolveComposerMediaType } from "./post-composer-logic";
+import {
+  canPublishComposerPost,
+  resolveComposerMediaType,
+} from "~/components/feed/post-composer-logic";
 
 describe("canPublishComposerPost", () => {
   it("allows text-only posts when a family context and caption are present", () => {
