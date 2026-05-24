@@ -464,7 +464,17 @@ export default function SinglePostPage() {
   }
 
   function findParentTopLevelComment(commentId: string) {
-    return comments.find((comment) => comment.id === commentId) ?? null;
+    for (const comment of comments) {
+      if (comment.id === commentId) {
+        return comment;
+      }
+
+      if (comment.replies.some((reply) => reply.id === commentId)) {
+        return comment;
+      }
+    }
+
+    return null;
   }
 
   async function invalidatePostSurfaceQueries() {
@@ -572,11 +582,27 @@ export default function SinglePostPage() {
   }
 
   function handleStartReply(commentId: string) {
+    const target = findCommentById(comments, commentId);
+
     setCommentActionError(null);
     setActiveEditCommentId(null);
     setEditDraft("");
     setEditMentions([]);
     setActiveReplyCommentId(commentId);
+
+    if (target?.parentCommentId) {
+      const mentionText = `@${target.author.name}`;
+      setReplyDraft(`${mentionText} `);
+      setReplyMentions([
+        {
+          memberId: target.author.id,
+          start: 0,
+          end: mentionText.length,
+        },
+      ]);
+      return;
+    }
+
     setReplyDraft("");
     setReplyMentions([]);
   }

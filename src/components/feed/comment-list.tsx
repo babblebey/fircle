@@ -80,7 +80,6 @@ export function CommentList({
                       onStartEdit={onStartEdit}
                       onDelete={onDelete}
                       likePending={isLikePending?.(reply.id)}
-                      showReply={false}
                     >
                       {renderInlineComposer?.(reply)}
                     </CommentCard>
