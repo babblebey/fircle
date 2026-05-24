@@ -8,7 +8,7 @@ Fircle is a family-focused social network: a private space designed for families
 
 Mainstream social platforms are public-first and not built around real family structure and privacy needs. Fircle solves this by offering a family-first network with controlled access, identity-aware sharing, and memory-centered features.
 
-Goal for the near term: ship a functional MVP quickly.
+Goal for the near term: move from MVP foundation into Phase 2 by shipping a reliable notifications system across transactional email and push, supported by a solid PWA experience.
 
 ## Target Audience
 
@@ -45,17 +45,25 @@ Open-source MVP focused on becoming functional quickly for one family instance, 
 
 ## Current Status
 
+### Delivered (Phase 1 MVP foundation)
 - [x] Project scaffolded
 - [x] Invite-only registration
 - [x] Family member auth and onboarding
 - [x] Unclaimed member profile creation
 - [x] Account claiming flow
-- [x] Post creation with media uploads
+- [x] Post creation with photo and video uploads
 - [x] Member tagging in photos and videos
+- [ ] Member mention in post caption
+
+### Active Focus (Phase 2)
+- [ ] Notifications platform foundation
+- [ ] Transactional email notifications
+- [ ] Push notifications (web push)
+- [ ] PWA enablement for reliable install and push UX
 
 ## Roadmap
 
-### Phase 1 - Functional MVP (single-family mode)
+### Phase 1 - Functional MVP (single-family mode) [Completed]
 - Invite-only registration
 - Family member auth and onboarding
 - Unclaimed member profiles
@@ -63,12 +71,20 @@ Open-source MVP focused on becoming functional quickly for one family instance, 
 - Post creation with photos and videos
 - Member tagging in media
 
-### Phase 2 - Memory Experience
-- Tag notifications for claimed members
+### Phase 2 - Notifications and Engagement [In Progress]
+- Build notifications domain model (events, preferences, delivery logs)
+- Add transactional email pipeline for core events
+- Add web push subscription and delivery flow
+- Convert app to PWA (manifest, service worker, installability)
+- Ensure notification UX works well on mobile home-screen installs
+- Complete member mention in post caption and connect to notifications
+
+### Phase 3 - Memory Experience
 - Per-member memory timeline (all tagged photos and videos)
+- Tag notification refinements for claimed members
 - Basic moderation and content controls for family admins
 
-### Phase 3 - Multi-tenancy and Hosting
+### Phase 4 - Multi-tenancy and Hosting
 - Multi-tenancy model for isolated family instances
 - Tenant-aware auth, routing, and data boundaries
 - Self-hosting and deployment guidance per family instance
