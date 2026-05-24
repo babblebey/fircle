@@ -11,6 +11,13 @@ import {
 
 const MAX_MEDIA_PER_POST = 10;
 const MAX_REPLY_PREVIEW_PER_PARENT = 3;
+const MAX_MENTIONS_PER_ENTITY = 20;
+
+const mentionInputSchema = z.object({
+  memberId: z.string().cuid(),
+  start: z.number().int().min(0),
+  end: z.number().int().min(1),
+});
 
 function isAbsoluteUrl(value: string) {
   try {
@@ -31,6 +38,7 @@ export const createPostInputSchema = z
   .object({
     familyId: z.string().cuid(),
     caption: z.string().trim().max(5000).optional(),
+    mentions: z.array(mentionInputSchema).max(MAX_MENTIONS_PER_ENTITY).default([]),
     type: z.enum(["TEXT", "PHOTO", "VIDEO", "MIXED"]),
     media: z
       .array(
@@ -57,6 +65,13 @@ export const createPostInputSchema = z
       .default([]),
   })
   .superRefine((input, ctx) => {
+    validateMentionRanges({
+      text: input.caption?.trim() ?? "",
+      mentions: input.mentions,
+      ctx,
+      path: ["mentions"],
+    });
+
     if (input.type === "TEXT" && input.media.length > 0) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
@@ -127,12 +142,22 @@ export const toggleLikeInputSchema = z.object({
   postId: z.string().cuid(),
 });
 
-export const createCommentInputSchema = z.object({
-  familyId: z.string().cuid(),
-  postId: z.string().cuid(),
-  content: z.string().trim().min(1).max(2000),
-  parentCommentId: z.string().cuid().optional(),
-});
+export const createCommentInputSchema = z
+  .object({
+    familyId: z.string().cuid(),
+    postId: z.string().cuid(),
+    content: z.string().trim().min(1).max(2000),
+    mentions: z.array(mentionInputSchema).max(MAX_MENTIONS_PER_ENTITY).default([]),
+    parentCommentId: z.string().cuid().optional(),
+  })
+  .superRefine((input, ctx) => {
+    validateMentionRanges({
+      text: input.content,
+      mentions: input.mentions,
+      ctx,
+      path: ["mentions"],
+    });
+  });
 
 export const getCommentsInputSchema = z.object({
   familyId: z.string().cuid(),
@@ -142,11 +167,21 @@ export const getCommentsInputSchema = z.object({
   parentCommentId: z.string().cuid().optional(),
 });
 
-export const updateCommentInputSchema = z.object({
-  familyId: z.string().cuid(),
-  commentId: z.string().cuid(),
-  content: z.string().trim().min(1).max(2000),
-});
+export const updateCommentInputSchema = z
+  .object({
+    familyId: z.string().cuid(),
+    commentId: z.string().cuid(),
+    content: z.string().trim().min(1).max(2000),
+    mentions: z.array(mentionInputSchema).max(MAX_MENTIONS_PER_ENTITY).default([]),
+  })
+  .superRefine((input, ctx) => {
+    validateMentionRanges({
+      text: input.content,
+      mentions: input.mentions,
+      ctx,
+      path: ["mentions"],
+    });
+  });
 
 export const deleteCommentInputSchema = z.object({
   familyId: z.string().cuid(),
@@ -157,6 +192,51 @@ export const toggleCommentLikeInputSchema = z.object({
   familyId: z.string().cuid(),
   commentId: z.string().cuid(),
 });
+
+function validateMentionRanges(input: {
+  text: string;
+  mentions: Array<z.infer<typeof mentionInputSchema>>;
+  ctx: z.RefinementCtx;
+  path: (string | number)[];
+}) {
+  const sortedMentions = [...input.mentions]
+    .map((mention, index) => ({ mention, index }))
+    .sort((a, b) => a.mention.start - b.mention.start || a.mention.end - b.mention.end);
+
+  let previousEnd = -1;
+  for (const item of sortedMentions) {
+    const { mention, index } = item;
+
+    if (mention.start >= mention.end) {
+      input.ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: [...input.path, index, "start"],
+        message: "Mention start must be less than end",
+      });
+      continue;
+    }
+
+    if (mention.end > input.text.length) {
+      input.ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: [...input.path, index, "end"],
+        message: "Mention range must be within content bounds",
+      });
+      continue;
+    }
+
+    if (mention.start < previousEnd) {
+      input.ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: [...input.path, index, "start"],
+        message: "Mention ranges cannot overlap",
+      });
+      continue;
+    }
+
+    previousEnd = mention.end;
+  }
+}
 
 function parseCursor(cursor?: string) {
   if (!cursor) {
@@ -311,6 +391,32 @@ type MediaTagRecord = {
   };
 };
 
+type PostMentionRecord = {
+  id: string;
+  mentionedMemberId: string;
+  start: number;
+  end: number;
+  mentionedMember: {
+    id: string;
+    name: string;
+    slug: string;
+    image: string | null;
+  };
+};
+
+type CommentMentionRecord = {
+  id: string;
+  mentionedMemberId: string;
+  start: number;
+  end: number;
+  mentionedMember: {
+    id: string;
+    name: string;
+    slug: string;
+    image: string | null;
+  };
+};
+
 function mapMediaTagResponse(tag: MediaTagRecord) {
   const toNumber = (value: unknown) => (value === null ? null : Number(value));
 
@@ -333,6 +439,34 @@ function mapMediaTagResponse(tag: MediaTagRecord) {
   };
 }
 
+function mapPostMentionResponse(mention: PostMentionRecord) {
+  return {
+    id: mention.id,
+    start: mention.start,
+    end: mention.end,
+    member: {
+      id: mention.mentionedMember.id,
+      name: mention.mentionedMember.name,
+      slug: mention.mentionedMember.slug,
+      avatarUrl: mention.mentionedMember.image ?? "",
+    },
+  };
+}
+
+function mapCommentMentionResponse(mention: CommentMentionRecord) {
+  return {
+    id: mention.id,
+    start: mention.start,
+    end: mention.end,
+    member: {
+      id: mention.mentionedMember.id,
+      name: mention.mentionedMember.name,
+      slug: mention.mentionedMember.slug,
+      avatarUrl: mention.mentionedMember.image ?? "",
+    },
+  };
+}
+
 function postResponseSelect(currentViewerMemberId: string) {
   return {
     id: true,
@@ -345,6 +479,23 @@ function postResponseSelect(currentViewerMemberId: string) {
         name: true,
         slug: true,
         image: true,
+      },
+    },
+    mentions: {
+      orderBy: [{ start: "asc" as const }, { id: "asc" as const }],
+      select: {
+        id: true,
+        mentionedMemberId: true,
+        start: true,
+        end: true,
+        mentionedMember: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            image: true,
+          },
+        },
       },
     },
     media: {
@@ -410,6 +561,7 @@ function mapPostResponse(post: {
   caption: string | null;
   createdAt: Date;
   authorMember: { id: string; name: string; slug: string; image: string | null };
+  mentions: PostMentionRecord[];
   likes: Array<{ id: string }>;
   _count: { likes: number; comments: number };
   media: Array<{
@@ -463,6 +615,7 @@ function mapPostResponse(post: {
       slug: post.authorMember.slug,
       avatarUrl: post.authorMember.image ?? "",
     },
+    mentions: (post.mentions ?? []).map((mention) => mapPostMentionResponse(mention)),
     media: mappedMedia.map(({ mediaRecord, tags }) => ({
       ...mediaRecord,
       tags,
@@ -490,6 +643,7 @@ type CommentRecordBase = {
   createdAt: Date;
   updatedAt: Date;
   authorMember: { id: string; name: string; slug: string; image: string | null };
+  mentions?: CommentMentionRecord[];
   likes: Array<{ id: string }>;
   _count: { likes: number; replies: number };
 };
@@ -507,6 +661,17 @@ type CommentResponse = {
     slug: string;
     avatarUrl: string;
   };
+  mentions: Array<{
+    id: string;
+    start: number;
+    end: number;
+    member: {
+      id: string;
+      name: string;
+      slug: string;
+      avatarUrl: string;
+    };
+  }>;
   likedByCurrentUser: boolean;
   likeCount: number;
   replyCount: number;
@@ -527,11 +692,92 @@ function mapCommentResponse(comment: CommentRecordBase, replies: CommentRecordBa
       slug: comment.authorMember.slug,
       avatarUrl: comment.authorMember.image ?? "",
     },
+    mentions: (comment.mentions ?? []).map((mention) => mapCommentMentionResponse(mention)),
     likedByCurrentUser: comment.likes.length > 0,
     likeCount: comment._count.likes,
     replyCount: comment._count.replies,
     replies: replies.map((reply) => mapCommentResponse(reply)),
   };
+}
+
+function commentResponseSelect(currentViewerMemberId: string) {
+  return {
+    id: true,
+    postId: true,
+    parentCommentId: true,
+    content: true,
+    createdAt: true,
+    updatedAt: true,
+    authorMember: {
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        image: true,
+      },
+    },
+    mentions: {
+      orderBy: [{ start: "asc" as const }, { id: "asc" as const }],
+      select: {
+        id: true,
+        mentionedMemberId: true,
+        start: true,
+        end: true,
+        mentionedMember: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            image: true,
+          },
+        },
+      },
+    },
+    likes: {
+      where: {
+        memberIdWhoLiked: currentViewerMemberId,
+      },
+      select: {
+        id: true,
+      },
+    },
+    _count: {
+      select: {
+        likes: true,
+        replies: true,
+      },
+    },
+  };
+}
+
+async function assertMentionMembersBelongToFamily(input: {
+  db: typeof appDb;
+  familyId: string;
+  mentions: Array<z.infer<typeof mentionInputSchema>>;
+}) {
+  const memberIds = Array.from(new Set(input.mentions.map((mention) => mention.memberId)));
+  if (memberIds.length === 0) {
+    return;
+  }
+
+  const familyMembers = await input.db.familyMember.findMany({
+    where: {
+      familyId: input.familyId,
+      id: {
+        in: memberIds,
+      },
+    },
+    select: {
+      id: true,
+    },
+  });
+
+  if (familyMembers.length !== memberIds.length) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "One or more mentioned members are not part of this family",
+    });
+  }
 }
 
 async function requireFamilyMembership(familyId: string, userId: string, db: typeof appDb) {
@@ -570,6 +816,12 @@ export const postRouter = createTRPCRouter({
         ctx.db,
       );
 
+      await assertMentionMembersBelongToFamily({
+        db: ctx.db,
+        familyId: input.familyId,
+        mentions: input.mentions,
+      });
+
       return ctx.db.$transaction(async (tx) => {
         const post = await tx.post.create({
           data: {
@@ -595,6 +847,17 @@ export const postRouter = createTRPCRouter({
               durationMs: media.durationMs,
               caption: media.caption,
               sortOrder: index,
+            })),
+          });
+        }
+
+        if (input.mentions.length > 0) {
+          await tx.postMention.createMany({
+            data: input.mentions.map((mention) => ({
+              postId: post.id,
+              mentionedMemberId: mention.memberId,
+              start: mention.start,
+              end: mention.end,
             })),
           });
         }
@@ -820,15 +1083,26 @@ export const postRouter = createTRPCRouter({
           authorMember: {
             familyId: input.familyId,
           },
-          media: {
-            some: {
-              mediaTags: {
+          OR: [
+            {
+              media: {
                 some: {
-                  taggedMemberId: input.memberId,
+                  mediaTags: {
+                    some: {
+                      taggedMemberId: input.memberId,
+                    },
+                  },
                 },
               },
             },
-          },
+            {
+              mentions: {
+                some: {
+                  mentionedMemberId: input.memberId,
+                },
+              },
+            },
+          ],
           ...(cursor
             ? {
                 OR: [
@@ -861,6 +1135,12 @@ export const postRouter = createTRPCRouter({
     .input(createCommentInputSchema)
     .mutation(async ({ ctx, input }) => {
       const membership = await requireFamilyMembership(input.familyId, ctx.session.user.id, ctx.db);
+
+      await assertMentionMembersBelongToFamily({
+        db: ctx.db,
+        familyId: input.familyId,
+        mentions: input.mentions,
+      });
 
       const rateLimit = checkRateLimit(`comment:create:${membership.id}`, 50, 60_000);
       if (!rateLimit.ok) {
@@ -912,44 +1192,54 @@ export const postRouter = createTRPCRouter({
         parentCommentId = parent.id;
       }
 
-      const createdComment = await ctx.db.comment.create({
-        data: {
-          postId: post.id,
-          authorMemberId: membership.id,
-          parentCommentId,
-          content: input.content,
-        },
-        select: {
-          id: true,
-          postId: true,
-          parentCommentId: true,
-          content: true,
-          createdAt: true,
-          updatedAt: true,
-          authorMember: {
-            select: {
-              id: true,
-              name: true,
-              slug: true,
-              image: true,
+      const createdComment = input.mentions.length > 0
+        ? await ctx.db.$transaction(async (tx) => {
+            const comment = await tx.comment.create({
+              data: {
+                postId: post.id,
+                authorMemberId: membership.id,
+                parentCommentId,
+                content: input.content,
+              },
+              select: {
+                id: true,
+              },
+            });
+
+            await tx.commentMention.createMany({
+              data: input.mentions.map((mention) => ({
+                commentId: comment.id,
+                mentionedMemberId: mention.memberId,
+                start: mention.start,
+                end: mention.end,
+              })),
+            });
+
+            const created = await tx.comment.findUnique({
+              where: {
+                id: comment.id,
+              },
+              select: commentResponseSelect(membership.id),
+            });
+
+            if (!created) {
+              throw new TRPCError({
+                code: "INTERNAL_SERVER_ERROR",
+                message: "Failed to load created comment",
+              });
+            }
+
+            return created;
+          })
+        : await ctx.db.comment.create({
+            data: {
+              postId: post.id,
+              authorMemberId: membership.id,
+              parentCommentId,
+              content: input.content,
             },
-          },
-          likes: {
-            where: {
-              memberIdWhoLiked: membership.id,
-            },
-            select: {
-              id: true,
-            },
-          },
-          _count: {
-            select: {
-              likes: true,
-              replies: true,
-            },
-          },
-        },
-      });
+            select: commentResponseSelect(membership.id),
+          });
 
       return mapCommentResponse(createdComment);
     }),
@@ -1046,36 +1336,7 @@ export const postRouter = createTRPCRouter({
               parentCommentId: input.parentCommentId,
             },
             orderBy: [{ createdAt: "asc" }, { id: "asc" }],
-            select: {
-              id: true,
-              postId: true,
-              parentCommentId: true,
-              content: true,
-              createdAt: true,
-              updatedAt: true,
-              authorMember: {
-                select: {
-                  id: true,
-                  name: true,
-                  slug: true,
-                  image: true,
-                },
-              },
-              likes: {
-                where: {
-                  memberIdWhoLiked: membership.id,
-                },
-                select: {
-                  id: true,
-                },
-              },
-              _count: {
-                select: {
-                  likes: true,
-                  replies: true,
-                },
-              },
-            },
+            select: commentResponseSelect(membership.id),
           })
         : await ctx.db.comment.findMany({
             take: input.limit + 1,
@@ -1085,67 +1346,11 @@ export const postRouter = createTRPCRouter({
             },
             orderBy: [{ createdAt: "desc" }, { id: "desc" }],
             select: {
-              id: true,
-              postId: true,
-              parentCommentId: true,
-              content: true,
-              createdAt: true,
-              updatedAt: true,
-              authorMember: {
-                select: {
-                  id: true,
-                  name: true,
-                  slug: true,
-                  image: true,
-                },
-              },
-              likes: {
-                where: {
-                  memberIdWhoLiked: membership.id,
-                },
-                select: {
-                  id: true,
-                },
-              },
-              _count: {
-                select: {
-                  likes: true,
-                  replies: true,
-                },
-              },
+              ...commentResponseSelect(membership.id),
               replies: {
                 take: MAX_REPLY_PREVIEW_PER_PARENT,
                 orderBy: [{ createdAt: "asc" }, { id: "asc" }],
-                select: {
-                  id: true,
-                  postId: true,
-                  parentCommentId: true,
-                  content: true,
-                  createdAt: true,
-                  updatedAt: true,
-                  authorMember: {
-                    select: {
-                      id: true,
-                      name: true,
-                      slug: true,
-                      image: true,
-                    },
-                  },
-                  likes: {
-                    where: {
-                      memberIdWhoLiked: membership.id,
-                    },
-                    select: {
-                      id: true,
-                    },
-                  },
-                  _count: {
-                    select: {
-                      likes: true,
-                      replies: true,
-                    },
-                  },
-                },
+                select: commentResponseSelect(membership.id),
               },
             },
           });
@@ -1172,6 +1377,12 @@ export const postRouter = createTRPCRouter({
     .input(updateCommentInputSchema)
     .mutation(async ({ ctx, input }) => {
       const membership = await requireFamilyMembership(input.familyId, ctx.session.user.id, ctx.db);
+
+      await assertMentionMembersBelongToFamily({
+        db: ctx.db,
+        familyId: input.familyId,
+        mentions: input.mentions,
+      });
 
       const comment = await ctx.db.comment.findFirst({
         where: {
@@ -1202,43 +1413,51 @@ export const postRouter = createTRPCRouter({
         });
       }
 
-      const updatedComment = await ctx.db.comment.update({
-        where: {
-          id: comment.id,
-        },
-        data: {
-          content: input.content,
-        },
-        select: {
-          id: true,
-          postId: true,
-          parentCommentId: true,
-          content: true,
-          createdAt: true,
-          updatedAt: true,
-          authorMember: {
-            select: {
-              id: true,
-              name: true,
-              slug: true,
-              image: true,
-            },
+      const updatedComment = await ctx.db.$transaction(async (tx) => {
+        await tx.comment.update({
+          where: {
+            id: comment.id,
           },
-          likes: {
-            where: {
-              memberIdWhoLiked: membership.id,
-            },
-            select: {
-              id: true,
-            },
+          data: {
+            content: input.content,
           },
-          _count: {
-            select: {
-              likes: true,
-              replies: true,
-            },
+          select: {
+            id: true,
           },
-        },
+        });
+
+        await tx.commentMention.deleteMany({
+          where: {
+            commentId: comment.id,
+          },
+        });
+
+        if (input.mentions.length > 0) {
+          await tx.commentMention.createMany({
+            data: input.mentions.map((mention) => ({
+              commentId: comment.id,
+              mentionedMemberId: mention.memberId,
+              start: mention.start,
+              end: mention.end,
+            })),
+          });
+        }
+
+        const updated = await tx.comment.findUnique({
+          where: {
+            id: comment.id,
+          },
+          select: commentResponseSelect(membership.id),
+        });
+
+        if (!updated) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to load updated comment",
+          });
+        }
+
+        return updated;
       });
 
       return mapCommentResponse(updatedComment);

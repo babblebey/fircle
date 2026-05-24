@@ -10,6 +10,11 @@ import type { PostCardData } from "~/components/feed/post-card";
 import { Button } from "~/components/ui/button";
 import { ArrowLeft } from "~/components/ui/icons";
 import { api } from "~/trpc/react";
+import {
+  normalizeMentionsForSubmit,
+  type MentionDraft,
+  type MentionableMember,
+} from "~/components/feed/mention-helpers";
 
 function formatCreatedAtLabel(dateInput: Date | string) {
   const date = dateInput instanceof Date ? dateInput : new Date(dateInput);
@@ -51,6 +56,17 @@ function mapPostToPostCardData(item: {
   author: { name: string; slug: string; avatarUrl: string };
   createdAt: Date | string;
   caption: string | null;
+  mentions?: Array<{
+    id: string;
+    start: number;
+    end: number;
+    member: {
+      id: string;
+      name: string;
+      slug: string;
+      avatarUrl: string;
+    };
+  }>;
   likedByCurrentUser?: boolean;
   reactionCount?: number;
   commentCount?: number;
@@ -87,6 +103,7 @@ function mapPostToPostCardData(item: {
     },
     createdAtLabel: formatCreatedAtLabel(item.createdAt),
     body: item.caption ?? "",
+    mentions: item.mentions ?? [],
     mediaItems: item.mediaItems.map((media) => ({
       id: media.id,
       type: media.type === "video" ? "video" : "image",
@@ -130,6 +147,17 @@ type CommentApiItem = {
     slug: string;
     avatarUrl: string;
   };
+  mentions: Array<{
+    id: string;
+    start: number;
+    end: number;
+    member: {
+      id: string;
+      name: string;
+      slug: string;
+      avatarUrl: string;
+    };
+  }>;
   likedByCurrentUser: boolean;
   likeCount: number;
   replyCount: number;
@@ -214,10 +242,13 @@ export default function SinglePostPage() {
   const trpcUtils = api.useUtils();
 
   const [topLevelDraft, setTopLevelDraft] = useState("");
+  const [topLevelMentions, setTopLevelMentions] = useState<MentionDraft[]>([]);
   const [activeReplyCommentId, setActiveReplyCommentId] = useState<string | null>(null);
   const [replyDraft, setReplyDraft] = useState("");
+  const [replyMentions, setReplyMentions] = useState<MentionDraft[]>([]);
   const [activeEditCommentId, setActiveEditCommentId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState("");
+  const [editMentions, setEditMentions] = useState<MentionDraft[]>([]);
   const [commentActionError, setCommentActionError] = useState<string | null>(null);
   const [commentActionStatus, setCommentActionStatus] = useState<string | null>(null);
   const [likeOverrides, setLikeOverrides] = useState<Record<string, LikeOverride>>({});
@@ -242,6 +273,25 @@ export default function SinglePostPage() {
   const currentUser = memberProfileQuery.data
     ? { name: memberProfileQuery.data.name, avatarUrl: memberProfileQuery.data.image ?? undefined }
     : undefined;
+
+  const familyMembersQuery = api.familyMember.listFamilyMembers.useQuery(
+    { familyId: familyId ?? "" },
+    {
+      enabled: Boolean(familyId),
+      retry: false,
+      refetchOnWindowFocus: false,
+    },
+  );
+
+  const mentionMembers = useMemo<MentionableMember[]>(
+    () =>
+      (familyMembersQuery.data ?? []).map((member) => ({
+        id: member.id,
+        name: member.name,
+        avatarUrl: member.image ?? "",
+      })),
+    [familyMembersQuery.data],
+  );
 
   const postQuery = api.post.getById.useQuery(
     {
@@ -431,8 +481,11 @@ export default function SinglePostPage() {
   function handleSubmitTopLevelComment() {
     if (!commentsInput || !memberProfileQuery.data) return;
 
-    const content = topLevelDraft.trim();
-    if (!content) return;
+    const normalized = normalizeMentionsForSubmit({
+      text: topLevelDraft,
+      mentions: topLevelMentions,
+    });
+    if (!normalized.text) return;
 
     setCommentActionError(null);
     setCommentActionStatus("Posting comment...");
@@ -444,7 +497,7 @@ export default function SinglePostPage() {
       id: tempId,
       postId,
       parentCommentId: null,
-      content,
+      content: normalized.text,
       createdAt: now,
       updatedAt: now,
       author: {
@@ -453,6 +506,7 @@ export default function SinglePostPage() {
         slug: memberProfileQuery.data.slug,
         avatarUrl: memberProfileQuery.data.image ?? "",
       },
+      mentions: [],
       likedByCurrentUser: false,
       likeCount: 0,
       replyCount: 0,
@@ -460,6 +514,7 @@ export default function SinglePostPage() {
     };
 
     setTopLevelDraft("");
+    setTopLevelMentions([]);
 
     trpcUtils.post.getComments.setData(commentsInput, (previous) => {
       if (!previous) {
@@ -480,7 +535,8 @@ export default function SinglePostPage() {
       {
         familyId: commentsInput.familyId,
         postId: commentsInput.postId,
-        content,
+        content: normalized.text,
+        mentions: normalized.mentions,
       },
       {
         onSuccess: (created) => {
@@ -506,7 +562,8 @@ export default function SinglePostPage() {
             };
           });
           incrementPostCommentCount(-1);
-          setTopLevelDraft(content);
+          setTopLevelDraft(normalized.text);
+          setTopLevelMentions(normalized.mentions);
           setCommentActionError(error.message);
           setCommentActionStatus("Failed to post comment.");
         },
@@ -518,8 +575,10 @@ export default function SinglePostPage() {
     setCommentActionError(null);
     setActiveEditCommentId(null);
     setEditDraft("");
+    setEditMentions([]);
     setActiveReplyCommentId(commentId);
     setReplyDraft("");
+    setReplyMentions([]);
   }
 
   function handleStartEdit(commentId: string) {
@@ -529,8 +588,16 @@ export default function SinglePostPage() {
     setCommentActionError(null);
     setActiveReplyCommentId(null);
     setReplyDraft("");
+    setReplyMentions([]);
     setActiveEditCommentId(commentId);
     setEditDraft(target.content);
+    setEditMentions(
+      (target.mentions ?? []).map((mention) => ({
+        memberId: mention.member.id,
+        start: mention.start,
+        end: mention.end,
+      })),
+    );
   }
 
   function handleSubmitReply() {
@@ -539,8 +606,11 @@ export default function SinglePostPage() {
     const parentComment = findParentTopLevelComment(activeReplyCommentId);
     if (!parentComment) return;
 
-    const content = replyDraft.trim();
-    if (!content) return;
+    const normalized = normalizeMentionsForSubmit({
+      text: replyDraft,
+      mentions: replyMentions,
+    });
+    if (!normalized.text) return;
 
     setCommentActionError(null);
     setCommentActionStatus("Posting reply...");
@@ -550,7 +620,8 @@ export default function SinglePostPage() {
         familyId: commentsInput.familyId,
         postId: commentsInput.postId,
         parentCommentId: parentComment.id,
-        content,
+        content: normalized.text,
+        mentions: normalized.mentions,
       },
       {
         onSuccess: (created) => {
@@ -575,6 +646,7 @@ export default function SinglePostPage() {
 
           incrementPostCommentCount(1);
           setReplyDraft("");
+          setReplyMentions([]);
           setActiveReplyCommentId(null);
           setCommentActionStatus("Reply posted.");
           void invalidatePostSurfaceQueries();
@@ -590,8 +662,11 @@ export default function SinglePostPage() {
   function handleSubmitEdit(commentId: string) {
     if (!commentsInput) return;
 
-    const content = editDraft.trim();
-    if (!content) return;
+    const normalized = normalizeMentionsForSubmit({
+      text: editDraft,
+      mentions: editMentions,
+    });
+    if (!normalized.text) return;
 
     setCommentActionError(null);
     setCommentActionStatus("Saving comment...");
@@ -600,7 +675,8 @@ export default function SinglePostPage() {
       {
         familyId: commentsInput.familyId,
         commentId,
-        content,
+        content: normalized.text,
+        mentions: normalized.mentions,
       },
       {
         onSuccess: (updated) => {
@@ -613,12 +689,14 @@ export default function SinglePostPage() {
                 ...comment,
                 content: updated.content,
                 updatedAt: updated.updatedAt,
+                mentions: updated.mentions,
               })),
             };
           });
 
           setActiveEditCommentId(null);
           setEditDraft("");
+          setEditMentions([]);
           setCommentActionStatus("Comment updated.");
           void invalidatePostSurfaceQueries();
         },
@@ -837,6 +915,9 @@ export default function SinglePostPage() {
           user={currentUser}
           value={topLevelDraft}
           onChange={setTopLevelDraft}
+          mentionMembers={mentionMembers}
+          mentions={topLevelMentions}
+          onMentionsChange={setTopLevelMentions}
           onSubmit={handleSubmitTopLevelComment}
           submitLabel="Reply"
           pending={isPostingTopLevelComment}
@@ -875,6 +956,7 @@ export default function SinglePostPage() {
         <CommentList
           comments={comments}
           currentMemberId={memberProfileQuery.data?.id}
+          currentMemberSlug={memberProfileQuery.data?.slug}
           onToggleLike={handleToggleLike}
           onStartReply={handleStartReply}
           onStartEdit={handleStartEdit}
@@ -897,6 +979,9 @@ export default function SinglePostPage() {
                   user={currentUser}
                   value={editDraft}
                   onChange={setEditDraft}
+                  mentionMembers={mentionMembers}
+                  mentions={editMentions}
+                  onMentionsChange={setEditMentions}
                   onSubmit={() => handleSubmitEdit(comment.id)}
                   placeholder="Edit your comment"
                   submitLabel="Save"
@@ -906,6 +991,7 @@ export default function SinglePostPage() {
                   onCancel={() => {
                     setActiveEditCommentId(null);
                     setEditDraft("");
+                    setEditMentions([]);
                   }}
                 />
               );
@@ -917,6 +1003,9 @@ export default function SinglePostPage() {
                   user={currentUser}
                   value={replyDraft}
                   onChange={setReplyDraft}
+                  mentionMembers={mentionMembers}
+                  mentions={replyMentions}
+                  onMentionsChange={setReplyMentions}
                   onSubmit={handleSubmitReply}
                   placeholder="Write a reply"
                   submitLabel="Reply"
@@ -926,6 +1015,7 @@ export default function SinglePostPage() {
                   onCancel={() => {
                     setActiveReplyCommentId(null);
                     setReplyDraft("");
+                    setReplyMentions([]);
                   }}
                 />
               );

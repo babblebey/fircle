@@ -120,6 +120,27 @@ function parseDate(input) {
   return new Date(input);
 }
 
+function collectMentionRanges(content, displayName) {
+  const token = `@${displayName}`;
+  const ranges = [];
+  let fromIndex = 0;
+
+  while (fromIndex < content.length) {
+    const start = content.indexOf(token, fromIndex);
+    if (start === -1) {
+      break;
+    }
+
+    ranges.push({
+      start,
+      end: start + token.length,
+    });
+    fromIndex = start + token.length;
+  }
+
+  return ranges;
+}
+
 function slugifyMemberText(value) {
   const normalized = value
     .normalize("NFKD")
@@ -285,6 +306,7 @@ async function main() {
       caption: "Family game night is back on this Friday! @Noah Shittabey please don't forget the snacks this time 😅",
       type: "TEXT",
       createdAt: new Date(now - 1 * 60 * 60 * 1000),
+      mentions: ["Noah Shittabey"],
       media: [],
     },
     {
@@ -292,6 +314,7 @@ async function main() {
       caption: "Baked Grandma Evelyn's famous lemon cake for the first time. Not bad for a first try!",
       type: "PHOTO",
       createdAt: new Date(now - 3 * 24 * 60 * 60 * 1000),
+      mentions: [],
       media: [
         {
           type: "IMAGE",
@@ -314,6 +337,7 @@ async function main() {
       caption: "Finished putting together the new bookshelf. Took three hours and one minor injury but we got there. @Emma Shittabey — your turn to decide what goes on it.",
       type: "TEXT",
       createdAt: new Date(now - 2 * 60 * 60 * 1000),
+      mentions: ["Emma Shittabey"],
       media: [],
     },
     {
@@ -321,6 +345,7 @@ async function main() {
       caption: "Saturday morning hike with @Lily Shittabey and @Logan Ross. The views were absolutely worth it.",
       type: "PHOTO",
       createdAt: new Date(now - 5 * 24 * 60 * 60 * 1000),
+      mentions: ["Lily Shittabey", "Logan Ross"],
       media: [
         {
           type: "IMAGE",
@@ -349,6 +374,7 @@ async function main() {
       caption: "Just got my exam results back — passed with distinction! Couldn't have done it without the support from this whole family 🎉",
       type: "TEXT",
       createdAt: new Date(now - 30 * 60 * 1000),
+      mentions: [],
       media: [],
     },
     {
@@ -356,6 +382,7 @@ async function main() {
       caption: "Quick clip from our pottery class. @Ava Kim this one's for you — told you I'd share it!",
       type: "VIDEO",
       createdAt: new Date(now - 7 * 24 * 60 * 60 * 1000),
+      mentions: ["Ava Kim"],
       media: [
         {
           type: "VIDEO",
@@ -373,6 +400,7 @@ async function main() {
       caption: "Anyone up for a barbecue this weekend? I'm thinking Sunday afternoon. @Noah Shittabey already volunteered to man the grill.",
       type: "TEXT",
       createdAt: new Date(now - 4 * 60 * 60 * 1000),
+      mentions: ["Noah Shittabey"],
       media: [],
     },
     {
@@ -380,6 +408,7 @@ async function main() {
       caption: "Weekend in the city. Highlights: street food, live music, and getting completely lost twice.",
       type: "MIXED",
       createdAt: new Date(now - 6 * 24 * 60 * 60 * 1000),
+      mentions: [],
       media: [
         {
           type: "IMAGE",
@@ -409,6 +438,7 @@ async function main() {
       caption: "So grateful to the Shittabey family for making me feel like one of their own. @Emma Shittabey your hospitality is unmatched!",
       type: "TEXT",
       createdAt: new Date(now - 5 * 60 * 60 * 1000),
+      mentions: ["Emma Shittabey"],
       media: [],
     },
     {
@@ -416,6 +446,7 @@ async function main() {
       caption: "Pottery class recap! @Lily Shittabey this was such a fun idea. We're definitely going back.",
       type: "MIXED",
       createdAt: new Date(now - 2 * 24 * 60 * 60 * 1000),
+      mentions: ["Lily Shittabey"],
       media: [
         {
           type: "IMAGE",
@@ -506,6 +537,72 @@ async function main() {
 
   const memberIds = Array.from(memberIdByName.values()).sort();
 
+  // Rebuild post mentions deterministically for fixture-backed posts.
+  const postMentionsToCreate = [];
+  const mentionedPostIds = new Set();
+
+  for (const fixture of postFixtures) {
+    if (!Array.isArray(fixture.mentions) || fixture.mentions.length === 0) {
+      continue;
+    }
+
+    const authorMemberId = memberIdByName.get(fixture.authorName);
+    if (!authorMemberId) {
+      continue;
+    }
+
+    const matchingPost = seededPosts.find(
+      (post) => post.authorMemberId === authorMemberId && post.caption === fixture.caption,
+    );
+    if (!matchingPost) {
+      continue;
+    }
+
+    for (const mentionedMemberName of fixture.mentions) {
+      const mentionedMemberId = memberIdByName.get(mentionedMemberName);
+      if (!mentionedMemberId) {
+        throw new Error(
+          `Missing mentioned member for fixture post "${fixture.caption}": ${mentionedMemberName}`,
+        );
+      }
+
+      const ranges = collectMentionRanges(fixture.caption, mentionedMemberName);
+      if (ranges.length === 0) {
+        throw new Error(
+          `Could not find mention token @${mentionedMemberName} in fixture caption: ${fixture.caption}`,
+        );
+      }
+
+      for (const range of ranges) {
+        postMentionsToCreate.push({
+          postId: matchingPost.id,
+          mentionedMemberId,
+          start: range.start,
+          end: range.end,
+        });
+      }
+    }
+
+    mentionedPostIds.add(matchingPost.id);
+  }
+
+  if (mentionedPostIds.size > 0) {
+    await db.postMention.deleteMany({
+      where: {
+        postId: {
+          in: Array.from(mentionedPostIds),
+        },
+      },
+    });
+  }
+
+  if (postMentionsToCreate.length > 0) {
+    await db.postMention.createMany({
+      data: postMentionsToCreate,
+      skipDuplicates: true,
+    });
+  }
+
   // Make likes deterministic and idempotent: reset likes for seeded posts, then recreate.
   await db.postLike.deleteMany({
     where: {
@@ -552,7 +649,8 @@ async function main() {
       postCaption:
         "Just got my exam results back — passed with distinction! Couldn't have done it without the support from this whole family 🎉",
       authorName: "Emma Shittabey",
-      content: "You worked for this. We are all ridiculously proud of you.",
+      content: "You worked for this, @Lily Shittabey. We are all ridiculously proud of you.",
+      mentions: ["Lily Shittabey"],
       createdAt: new Date(now - 28 * 60 * 1000),
     },
     {
@@ -560,7 +658,8 @@ async function main() {
       postCaption:
         "Just got my exam results back — passed with distinction! Couldn't have done it without the support from this whole family 🎉",
       authorName: "Noah Shittabey",
-      content: "Distinction deserves celebratory pancakes this weekend.",
+      content: "Distinction deserves celebratory pancakes this weekend, @Lily Shittabey.",
+      mentions: ["Lily Shittabey"],
       createdAt: new Date(now - 26 * 60 * 1000),
     },
     {
@@ -568,7 +667,8 @@ async function main() {
       postCaption:
         "Family game night is back on this Friday! @Noah Shittabey please don't forget the snacks this time 😅",
       authorName: "Noah Shittabey",
-      content: "The snacks are already on the shopping list. No promises about my card strategy though.",
+      content: "The snacks are already on the shopping list, @Emma Shittabey. No promises about my card strategy though.",
+      mentions: ["Emma Shittabey"],
       createdAt: new Date(now - 50 * 60 * 1000),
     },
     {
@@ -576,7 +676,8 @@ async function main() {
       postCaption:
         "Anyone up for a barbecue this weekend? I'm thinking Sunday afternoon. @Noah Shittabey already volunteered to man the grill.",
       authorName: "Emma Shittabey",
-      content: "Sunday works for me. I'll bring the salad and lemonade.",
+      content: "Sunday works for me, @Logan Ross. I'll bring the salad and lemonade.",
+      mentions: ["Logan Ross"],
       createdAt: new Date(now - 3 * 60 * 60 * 1000 + 10 * 60 * 1000),
     },
     {
@@ -584,7 +685,8 @@ async function main() {
       postCaption:
         "Anyone up for a barbecue this weekend? I'm thinking Sunday afternoon. @Noah Shittabey already volunteered to man the grill.",
       authorName: "Ava Kim",
-      content: "Count me in. I can bring dessert if no one has claimed it yet.",
+      content: "Count me in, @Logan Ross. I can bring dessert if no one has claimed it yet.",
+      mentions: ["Logan Ross"],
       createdAt: new Date(now - 3 * 60 * 60 * 1000 + 18 * 60 * 1000),
     },
     {
@@ -592,7 +694,8 @@ async function main() {
       postCaption:
         "Pottery class recap! @Lily Shittabey this was such a fun idea. We're definitely going back.",
       authorName: "Emma Shittabey",
-      content: "Next time I want a full family pottery leaderboard.",
+      content: "Next time I want a full family pottery leaderboard, @Ava Kim.",
+      mentions: ["Ava Kim"],
       createdAt: new Date(now - 2 * 24 * 60 * 60 * 1000 + 30 * 60 * 1000),
     },
     {
@@ -600,7 +703,8 @@ async function main() {
       postCaption:
         "Just got my exam results back — passed with distinction! Couldn't have done it without the support from this whole family 🎉",
       authorName: "Ava Kim",
-      content: "Pancakes and a framed printout of the result, honestly.",
+      content: "Pancakes and a framed printout of the result, honestly, @Noah Shittabey.",
+      mentions: ["Noah Shittabey"],
       parentKey: "lily-results-noah",
       createdAt: new Date(now - 24 * 60 * 1000),
     },
@@ -609,7 +713,8 @@ async function main() {
       postCaption:
         "Family game night is back on this Friday! @Noah Shittabey please don't forget the snacks this time 😅",
       authorName: "Emma Shittabey",
-      content: "Documenting this promise so we can all refer back to it later.",
+      content: "Documenting this promise so we can all refer back to it later, @Noah Shittabey.",
+      mentions: ["Noah Shittabey"],
       parentKey: "game-night-noah",
       createdAt: new Date(now - 46 * 60 * 1000),
     },
@@ -618,7 +723,8 @@ async function main() {
       postCaption:
         "Anyone up for a barbecue this weekend? I'm thinking Sunday afternoon. @Noah Shittabey already volunteered to man the grill.",
       authorName: "Logan Ross",
-      content: "Dessert is officially yours. I'll handle the music and chairs.",
+      content: "Dessert is officially yours, @Ava Kim. I'll handle the music and chairs.",
+      mentions: ["Ava Kim"],
       parentKey: "barbecue-ava",
       createdAt: new Date(now - 3 * 60 * 60 * 1000 + 24 * 60 * 1000),
     },
@@ -627,7 +733,8 @@ async function main() {
       postCaption:
         "Pottery class recap! @Lily Shittabey this was such a fun idea. We're definitely going back.",
       authorName: "Lily Shittabey",
-      content: "Only if we agree not to compare our wobbly bowls afterward.",
+      content: "Only if we agree not to compare our wobbly bowls afterward, @Emma Shittabey.",
+      mentions: ["Emma Shittabey"],
       parentKey: "pottery-lily-emma",
       createdAt: new Date(now - 2 * 24 * 60 * 60 * 1000 + 45 * 60 * 1000),
     },
@@ -684,6 +791,51 @@ async function main() {
     commentIdByKey.set(fixture.key, comment.id);
   }
 
+  const commentMentionsToCreate = [];
+
+  for (const fixture of commentFixtures) {
+    if (!Array.isArray(fixture.mentions) || fixture.mentions.length === 0) {
+      continue;
+    }
+
+    const commentId = commentIdByKey.get(fixture.key);
+    if (!commentId) {
+      continue;
+    }
+
+    for (const mentionedMemberName of fixture.mentions) {
+      const mentionedMemberId = memberIdByName.get(mentionedMemberName);
+      if (!mentionedMemberId) {
+        throw new Error(
+          `Missing mentioned member for fixture comment "${fixture.key}": ${mentionedMemberName}`,
+        );
+      }
+
+      const ranges = collectMentionRanges(fixture.content, mentionedMemberName);
+      if (ranges.length === 0) {
+        throw new Error(
+          `Could not find mention token @${mentionedMemberName} in fixture comment content: ${fixture.content}`,
+        );
+      }
+
+      for (const range of ranges) {
+        commentMentionsToCreate.push({
+          commentId,
+          mentionedMemberId,
+          start: range.start,
+          end: range.end,
+        });
+      }
+    }
+  }
+
+  if (commentMentionsToCreate.length > 0) {
+    await db.commentMention.createMany({
+      data: commentMentionsToCreate,
+      skipDuplicates: true,
+    });
+  }
+
   const seededComments = await db.comment.findMany({
     where: {
       postId: {
@@ -734,8 +886,10 @@ async function main() {
   console.log(`Users seeded: ${usersFromMocks.length + 1}`);
   console.log(`Invites seeded: ${inviteFixtures.length}`);
   console.log(`Posts seeded: ${postsSeeded}`);
+  console.log(`Post mentions seeded: ${postMentionsToCreate.length}`);
   console.log(`Post likes seeded: ${likesToCreate.length}`);
   console.log(`Comments seeded: ${seededComments.length}`);
+  console.log(`Comment mentions seeded: ${commentMentionsToCreate.length}`);
   console.log(`Comment likes seeded: ${commentLikesToCreate.length}`);
   console.log(`Seed sign-in password for all users: ${SEED_PASSWORD}`);
 }

@@ -8,6 +8,17 @@ import { api } from "~/trpc/react";
 import { Button } from "~/components/ui/button";
 import type { ComposerOpenMode } from "./composer-entry";
 import { canPublishComposerPost } from "./post-composer-logic";
+import {
+  filterMentionMembers,
+  getMentionPopoverAnchor,
+  getActiveMentionQuery,
+  insertMentionAtQuery,
+  normalizeMentionsForSubmit,
+  reconcileMentionsOnTextChange,
+  type MentionDraft,
+  type MentionableMember,
+} from "~/components/feed/mention-helpers";
+import { MentionSuggestionsPopover } from "~/components/feed/mention-suggestions-popover";
 
 type UploadIntentItem = {
   provider: string;
@@ -107,6 +118,7 @@ export function PostComposerDialog({
   initialMode,
 }: PostComposerDialogProps) {
   const [caption, setCaption] = useState("");
+  const [captionMentions, setCaptionMentions] = useState<MentionDraft[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [selectedMedia, setSelectedMedia] = useState<SelectedMedia[]>([]);
   const [publishError, setPublishError] = useState<string | null>(null);
@@ -114,11 +126,50 @@ export function PostComposerDialog({
 
   const imageInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
+  const captionTextareaRef = useRef<HTMLTextAreaElement>(null);
   const autoPickerTriggeredRef = useRef(false);
   const selectedMediaRef = useRef<SelectedMedia[]>([]);
+  const [captionCaret, setCaptionCaret] = useState<number | null>(null);
+  const [activeMentionIndex, setActiveMentionIndex] = useState(0);
 
   const trpcUtils = api.useUtils();
   const createPost = api.post.create.useMutation();
+  const familyMembersQuery = api.familyMember.listFamilyMembers.useQuery(
+    { familyId: familyId ?? "" },
+    {
+      enabled: open && Boolean(familyId),
+      retry: false,
+      refetchOnWindowFocus: false,
+    },
+  );
+
+  const mentionMembers = useMemo<MentionableMember[]>(
+    () =>
+      (familyMembersQuery.data ?? []).map((member) => ({
+        id: member.id,
+        name: member.name,
+        avatarUrl: member.image ?? "",
+      })),
+    [familyMembersQuery.data],
+  );
+
+  const activeMentionQuery =
+    captionCaret !== null ? getActiveMentionQuery(caption, captionCaret) : null;
+  const mentionSuggestions = filterMentionMembers({
+    members: mentionMembers,
+    activeQuery: activeMentionQuery,
+  });
+  const showMentionSuggestions = Boolean(activeMentionQuery) && mentionMembers.length > 0;
+  const mentionPopoverAnchor = useMemo(() => {
+    if (!activeMentionQuery || !captionTextareaRef.current) {
+      return null;
+    }
+
+    return getMentionPopoverAnchor({
+      textarea: captionTextareaRef.current,
+      triggerIndex: activeMentionQuery.tokenStart,
+    });
+  }, [activeMentionQuery]);
 
   const canPublish = useMemo(
     () =>
@@ -140,6 +191,9 @@ export function PostComposerDialog({
 
   const resetComposer = useCallback(() => {
     setCaption("");
+    setCaptionMentions([]);
+    setCaptionCaret(null);
+    setActiveMentionIndex(0);
     setPublishError(null);
     setPublishSuccess(null);
     setSelectedMedia((current) => {
@@ -174,6 +228,12 @@ export function PostComposerDialog({
       revokeObjectUrls(selectedMediaRef.current);
     };
   }, [revokeObjectUrls]);
+
+  useEffect(() => {
+    if (activeMentionIndex >= mentionSuggestions.length) {
+      setActiveMentionIndex(0);
+    }
+  }, [activeMentionIndex, mentionSuggestions.length]);
 
   if (!open) {
     return null;
@@ -248,6 +308,11 @@ export function PostComposerDialog({
     setIsUploading(selectedMedia.length > 0);
 
     try {
+      const normalizedCaption = normalizeMentionsForSubmit({
+        text: caption,
+        mentions: captionMentions,
+      });
+
       const uploadedMedia: Array<{
         provider: string;
         bucket: string;
@@ -346,7 +411,8 @@ export function PostComposerDialog({
 
       await createPost.mutateAsync({
         familyId,
-        caption: caption.trim() || undefined,
+        caption: normalizedCaption.text || undefined,
+        mentions: normalizedCaption.mentions,
         type,
         media: uploadedMedia,
       });
@@ -360,6 +426,29 @@ export function PostComposerDialog({
     } finally {
       setIsUploading(false);
     }
+  };
+
+  const applyMentionSelection = (member: MentionableMember) => {
+    if (!activeMentionQuery || !captionTextareaRef.current) {
+      return;
+    }
+
+    const inserted = insertMentionAtQuery({
+      text: caption,
+      mentions: captionMentions,
+      activeQuery: activeMentionQuery,
+      member,
+    });
+
+    setCaption(inserted.text);
+    setCaptionMentions(inserted.mentions);
+    setCaptionCaret(inserted.caret);
+    setActiveMentionIndex(0);
+
+    requestAnimationFrame(() => {
+      captionTextareaRef.current?.focus();
+      captionTextareaRef.current?.setSelectionRange(inserted.caret, inserted.caret);
+    });
   };
 
   return (
@@ -413,13 +502,80 @@ export function PostComposerDialog({
             }}
           />
 
-          <textarea
-            value={caption}
-            onChange={(event) => setCaption(event.target.value)}
-            placeholder="Write a caption for this memory..."
-            rows={4}
-            className="w-full resize-none rounded-2xl border border-border bg-background px-4 py-3 text-sm outline-none transition focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30"
-          />
+          <div className="relative">
+            <textarea
+              ref={captionTextareaRef}
+              value={caption}
+              onChange={(event) => {
+                const nextCaption = event.target.value;
+                setCaptionMentions((current) =>
+                  reconcileMentionsOnTextChange(caption, nextCaption, current),
+                );
+                setCaption(nextCaption);
+                setCaptionCaret(event.target.selectionStart ?? nextCaption.length);
+              }}
+              onFocus={(event) => {
+                setCaptionCaret(event.currentTarget.selectionStart ?? caption.length);
+              }}
+              onBlur={() => {
+                setCaptionCaret(null);
+              }}
+              onClick={(event) => {
+                setCaptionCaret(event.currentTarget.selectionStart ?? caption.length);
+              }}
+              onKeyUp={(event) => {
+                setCaptionCaret(event.currentTarget.selectionStart ?? caption.length);
+              }}
+              onKeyDown={(event) => {
+                if (!showMentionSuggestions || mentionSuggestions.length === 0) {
+                  return;
+                }
+
+                if (event.key === "ArrowDown") {
+                  event.preventDefault();
+                  setActiveMentionIndex((current) =>
+                    current + 1 >= mentionSuggestions.length ? 0 : current + 1,
+                  );
+                  return;
+                }
+
+                if (event.key === "ArrowUp") {
+                  event.preventDefault();
+                  setActiveMentionIndex((current) =>
+                    current - 1 < 0 ? mentionSuggestions.length - 1 : current - 1,
+                  );
+                  return;
+                }
+
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  const selectedMember = mentionSuggestions[activeMentionIndex];
+                  if (selectedMember) {
+                    applyMentionSelection(selectedMember);
+                  }
+                  return;
+                }
+
+                if (event.key === "Escape") {
+                  event.preventDefault();
+                  setCaptionCaret(null);
+                }
+              }}
+              placeholder="Write a caption for this memory..."
+              rows={4}
+              className="w-full resize-none rounded-2xl border border-border bg-background px-4 py-3 text-sm outline-none transition focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30"
+            />
+
+            {showMentionSuggestions ? (
+              <MentionSuggestionsPopover
+                members={mentionSuggestions}
+                activeIndex={activeMentionIndex}
+                onHover={setActiveMentionIndex}
+                onSelect={applyMentionSelection}
+                anchor={mentionPopoverAnchor}
+              />
+            ) : null}
+          </div>
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <button

@@ -135,7 +135,7 @@ function MemberPickerPopover({
           className="w-full rounded-xl border border-border bg-background px-2.5 py-1.5 text-sm outline-none focus:ring-1 focus:ring-ring"
         />
       </div>
-      <div className="max-h-48 overflow-y-auto py-1">
+      <div className="max-h-48 overflow-y-auto p-1 scrollbar">
         {filtered.length === 0 ? (
           <p className="px-3 py-2 text-sm text-muted-foreground">No members found</p>
         ) : (
@@ -143,7 +143,7 @@ function MemberPickerPopover({
             <button
               key={member.id}
               type="button"
-              className="flex w-full items-center gap-2.5 px-3 py-2 text-sm transition-colors hover:bg-muted/60 disabled:opacity-50"
+              className="flex w-full items-center gap-2.5 px-3 py-2 text-sm transition-colors hover:bg-muted/60 disabled:opacity-50 rounded-xl"
               onClick={() => onSelect(member.id)}
               disabled={isPending}
             >

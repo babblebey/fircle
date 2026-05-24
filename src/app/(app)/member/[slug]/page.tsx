@@ -39,6 +39,17 @@ function mapApiPostToPostCardData(item: {
   author: { name: string; slug: string; avatarUrl: string };
   createdAt: Date | string;
   caption: string | null;
+  mentions?: Array<{
+    id: string;
+    start: number;
+    end: number;
+    member: {
+      id: string;
+      name: string;
+      slug: string;
+      avatarUrl: string;
+    };
+  }>;
   likedByCurrentUser?: boolean;
   reactionCount?: number;
   commentCount?: number;
@@ -71,6 +82,7 @@ function mapApiPostToPostCardData(item: {
     author: { name: item.author.name, slug: item.author.slug, avatarUrl: item.author.avatarUrl },
     createdAtLabel: formatCreatedAtLabel(item.createdAt),
     body: item.caption ?? "",
+    mentions: item.mentions ?? [],
     mediaItems: item.mediaItems.map((m) => ({
       id: m.id,
       type: m.type === "video" ? "video" : "image",
@@ -93,7 +105,7 @@ type ProfileTab = "posts" | "tagged" | "liked";
 
 const tabs: { id: ProfileTab; label: string; icon: typeof FileText }[] = [
   { id: "posts", label: "Posts", icon: FileText },
-  { id: "tagged", label: "Tagged In", icon: Tag },
+  { id: "tagged", label: "Mentions & Tags", icon: Tag },
   { id: "liked", label: "Liked", icon: Heart },
 ];
 
@@ -266,8 +278,8 @@ export default function MemberProfilePage() {
                   ) : (
                     <EmptyState
                       icon={Tag}
-                      title="Not tagged yet"
-                      description={`Posts tagging ${member.name.split(" ")[0]} will appear here.`}
+                      title="No mentions or tags yet"
+                      description={`Posts that mention or tag ${member.name.split(" ")[0]} will appear here.`}
                     />
                   )}
                 </>

@@ -53,7 +53,8 @@ Open-source MVP focused on becoming functional quickly for one family instance, 
 - [x] Account claiming flow
 - [x] Post creation with photo and video uploads
 - [x] Member tagging in photos and videos
-- [ ] Member mention in post caption
+- [x] Member mention in post caption
+- [ ] Media Gallery (general and member)
 
 ### Active Focus (Phase 2)
 - [ ] Notifications platform foundation
@@ -70,6 +71,8 @@ Open-source MVP focused on becoming functional quickly for one family instance, 
 - Account claiming flow
 - Post creation with photos and videos
 - Member tagging in media
+- Member mention in post
+- Media Gallery
 
 ### Phase 2 - Notifications and Engagement [In Progress]
 - Build notifications domain model (events, preferences, delivery logs)
