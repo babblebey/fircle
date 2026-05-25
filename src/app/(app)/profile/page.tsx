@@ -4,10 +4,11 @@ import Link from "next/link";
 import { useState } from "react";
 
 import { PostCard } from "~/components/feed/post-card";
+import { MemberGalleryTab } from "~/components/gallery/member-gallery-tab";
 import { EditProfileDialog } from "~/components/members/edit-profile-dialog";
 import { MemberProfileHeader } from "~/components/members/member-profile-header";
 import { Button } from "~/components/ui/button";
-import { FileText, Heart, Tag, UserRoundX } from "~/components/ui/icons";
+import { FileText, Heart, Image, Tag, UserRoundX } from "~/components/ui/icons";
 import { cn } from "~/lib/utils";
 import { api } from "~/trpc/react";
 import type { FamilyMemberProfile } from "~/lib/mocks/family-members";
@@ -93,10 +94,11 @@ function mapApiPostToPostCardData(item: {
   };
 }
 
-type ProfileTab = "posts" | "tagged" | "liked";
+type ProfileTab = "posts" | "tagged" | "liked" | "gallery";
 
 const tabs: { id: ProfileTab; label: string; icon: typeof FileText }[] = [
   { id: "posts", label: "Posts", icon: FileText },
+  { id: "gallery", label: "Gallery", icon: Image },
   { id: "tagged", label: "Mentions & Tags", icon: Tag },
   { id: "liked", label: "Liked", icon: Heart },
 ];
@@ -157,9 +159,9 @@ export default function ProfilePage() {
   const isLoading = managementContext.isLoading || memberQuery.isLoading
 
   return (
-    <section className="mx-auto w-full max-w-2xl px-4 py-8 sm:px-6">
+    <section className="px-4 py-8 sm:px-6">
       {isLoading ? (
-        <div className="flex items-center justify-center py-12">
+        <div className="max-w-2xl mx-auto flex items-center justify-center py-12">
           <div className="text-center text-muted-foreground">Loading profile...</div>
         </div>
       ) : member ? (
@@ -170,7 +172,7 @@ export default function ProfilePage() {
           </div>
 
           <section>
-            <div className="flex border-b">
+            <div className="flex w-full max-w-2xl mx-auto border-b">
               {tabs.map(({ id, label, icon: Icon }) => (
                 <button
                   key={id}
@@ -193,7 +195,7 @@ export default function ProfilePage() {
               {activeTab === "posts" && (
                 <>
                   {memberPosts.length > 0 ? (
-                    <div className="space-y-4">
+                    <div className="space-y-4 mx-auto max-w-2xl">
                       {memberPosts.map((post) => (
                         <PostCard
                           key={post.id}
@@ -217,7 +219,7 @@ export default function ProfilePage() {
               {activeTab === "tagged" && (
                 <>
                   {taggedPosts.length > 0 ? (
-                    <div className="space-y-4">
+                    <div className="space-y-4 mx-auto max-w-2xl">
                       {taggedPosts.map((post) => (
                         <PostCard
                           key={post.id}
@@ -238,10 +240,16 @@ export default function ProfilePage() {
                 </>
               )}
 
+              {activeTab === "gallery" && member ? (
+                <div className="space-y-4 mx-auto max-w-6xl">
+                  <MemberGalleryTab familyId={familyId} memberId={member.id} memberName={member.name} />
+                </div>
+              ) : null}
+
               {activeTab === "liked" && (
                 <>
                   {likedPosts.length > 0 ? (
-                    <div className="space-y-4">
+                    <div className="space-y-4 mx-auto max-w-2xl">
                       {likedPosts.map((post) => (
                         <PostCard
                           key={post.id}
@@ -265,7 +273,7 @@ export default function ProfilePage() {
           </section>
         </div>
       ) : (
-        <div className="rounded-3xl border border-dashed p-8 text-center">
+        <div className="max-w-2xl mx-auto rounded-3xl border border-dashed p-8 text-center">
           <div className="mx-auto grid size-12 place-items-center rounded-full bg-muted text-muted-foreground">
             <UserRoundX className="size-5" aria-hidden="true" />
           </div>
@@ -292,7 +300,7 @@ function EmptyState({
   description: string;
 }) {
   return (
-    <div className="px-2 py-8 text-center">
+    <div className="px-2 py-8 text-center mx-auto max-w-2xl">
       <div className="mx-auto grid size-10 place-items-center rounded-full text-muted-foreground">
         <Icon className="size-5" aria-hidden="true" />
       </div>
