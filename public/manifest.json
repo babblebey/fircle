@@ -1,0 +1,25 @@
+{
+  "id": "/",
+  "name": "Fircle",
+  "short_name": "Fircle",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui", "browser"],
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "prefer_related_applications": false,
+  "icons": [
+    {
+      "src": "/icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}

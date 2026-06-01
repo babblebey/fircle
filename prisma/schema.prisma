@@ -92,6 +92,7 @@ model Family {
   invites     Invite[]
   notifications Notification[]
   notificationPreferences NotificationPreference[]
+  pushSubscriptions PushSubscription[]
 }
 
 model FamilyMember {
@@ -116,6 +117,7 @@ model FamilyMember {
   notificationsReceived Notification[] @relation("NotificationRecipient")
   notificationsAuthored Notification[] @relation("NotificationActor")
   notificationPreferences NotificationPreference[]
+  pushSubscriptions PushSubscription[]
 
   family Family @relation(fields: [familyId], references: [id], onDelete: Cascade)
   user   User?  @relation(fields: [userId], references: [id], onDelete: SetNull)
@@ -335,7 +337,8 @@ model NotificationPreference {
   id         String                      @id @default(cuid())
   familyId   String
   memberId   String
-  category   NotificationCategory?
+  category   NotificationCategory
+  eventType  NotificationEventType
   channel    NotificationDeliveryChannel @default(IN_APP)
   isEnabled  Boolean                     @default(true)
   createdAt  DateTime                    @default(now())
@@ -344,9 +347,32 @@ model NotificationPreference {
   family     Family                      @relation(fields: [familyId], references: [id], onDelete: Cascade)
   member     FamilyMember                @relation(fields: [memberId], references: [id], onDelete: Cascade)
 
-  @@unique([familyId, memberId, channel, category])
+  /// Default behavior for newly eligible members is an enabled fallback.
+  /// If no row exists yet for a family/member/channel/eventType combination,
+  /// delivery should be treated as enabled until an explicit preference is saved.
+  @@unique([familyId, memberId, channel, eventType])
   @@index([familyId, memberId, channel, isEnabled])
+  @@index([familyId, memberId, channel, category])
   @@index([memberId])
+}
+
+model PushSubscription {
+  id         String     @id @default(cuid())
+  familyId   String
+  memberId   String
+  endpoint   String     @unique
+  p256dh     String
+  auth       String
+  userAgent  String?
+  lastUsedAt DateTime?
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+
+  family     Family     @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  member     FamilyMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@index([familyId, memberId, createdAt])
+  @@index([memberId, createdAt])
 }
 
 model NotificationDeliveryLog {

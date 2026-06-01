@@ -4,11 +4,13 @@ import { type Metadata } from "next";
 import { Geist, Inter } from "next/font/google";
 
 import { NavigationProgress } from "~/components/nav/navigation-progress";
+import { PwaInstallPrompt } from "~/components/pwa/pwa-install-prompt";
+import { PwaRegistration } from "~/components/pwa/pwa-registration";
 import { ThemeProvider } from "~/components/theme-provider";
 import { TRPCReactProvider } from "~/trpc/react";
 import { cn } from "~/lib/utils";
 
-const inter = Inter({subsets:['latin'],variable:'--font-sans'});
+const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
 
 export const metadata: Metadata = {
   title: {
@@ -17,6 +19,8 @@ export const metadata: Metadata = {
   },
   description: "Family-first social network focused on private sharing and memory preservation.",
   applicationName: "Fircle",
+  manifest: "/manifest.json",
+  themeColor: "#0f172a",
   openGraph: {
     title: "Fircle",
     description: "Family-first social network focused on private sharing and memory preservation.",
@@ -55,6 +59,8 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <TRPCReactProvider>
+            <PwaRegistration />
+            <PwaInstallPrompt />
             <NavigationProgress />
             {children}
           </TRPCReactProvider>
