@@ -47,6 +47,18 @@ const duplicateEmailUser = {
   email: "existing-user@example.com",
 };
 
+const familySeedSlug = "shittabey-family";
+const seedHostDomains = [
+  {
+    domain: "localhost",
+    isPrimary: true,
+  },
+  {
+    domain: `${familySeedSlug}.fircle.app`,
+    isPrimary: false,
+  },
+];
+
 const inviteFixtures = [
   {
     code: "abc123xyz",
@@ -171,13 +183,26 @@ function resolveUniqueSeedSlug(usedSlugs, baseSlug) {
   throw new Error("Could not resolve a unique slug for seed member");
 }
 
-async function upsertUser(email, hashedPassword) {
-  return db.user.upsert({
-    where: { email },
-    update: {
-      password: hashedPassword,
+async function upsertUser(familyId, email, hashedPassword) {
+  const existingUser = await db.user.findFirst({
+    where: {
+      familyId,
+      email,
     },
-    create: {
+  });
+
+  if (existingUser) {
+    return db.user.update({
+      where: { id: existingUser.id },
+      data: {
+        password: hashedPassword,
+      },
+    });
+  }
+
+  return db.user.create({
+    data: {
+      familyId,
       email,
       password: hashedPassword,
     },
@@ -187,15 +212,34 @@ async function upsertUser(email, hashedPassword) {
 async function main() {
   const hashedPassword = await bcrypt.hash(SEED_PASSWORD, 12);
 
-  let family = await db.family.findFirst({
-    where: { name: "The Shittabey Family" },
+  const family = await db.family.upsert({
+    where: { slug: familySeedSlug },
+    update: {
+      name: "The Shittabey Family",
+      description: "A close-knit family sharing memories, photos, and updates.",
+    },
+    create: {
+      name: "The Shittabey Family",
+      slug: familySeedSlug,
+      description: "A close-knit family sharing memories, photos, and updates.",
+    },
   });
 
-  if (!family) {
-    family = await db.family.create({
-      data: {
-        name: "The Shittabey Family",
-        description: "A close-knit family sharing memories, photos, and updates.",
+  const verifiedAt = new Date();
+
+  for (const hostDomain of seedHostDomains) {
+    await db.domain.upsert({
+      where: { domain: hostDomain.domain },
+      update: {
+        familyId: family.id,
+        isPrimary: hostDomain.isPrimary,
+        verifiedAt,
+      },
+      create: {
+        familyId: family.id,
+        domain: hostDomain.domain,
+        isPrimary: hostDomain.isPrimary,
+        verifiedAt,
       },
     });
   }
@@ -209,7 +253,7 @@ async function main() {
   const usedSlugs = new Set(existingMemberSlugs.map((member) => member.slug));
 
   for (const userInput of usersFromMocks) {
-    const user = await upsertUser(userInput.email, hashedPassword);
+    const user = await upsertUser(family.id, userInput.email, hashedPassword);
     usersByName.set(userInput.name, user);
 
     const existingMembership = await db.familyMember.findUnique({
@@ -251,7 +295,7 @@ async function main() {
     });
   }
 
-  await upsertUser(duplicateEmailUser.email, hashedPassword);
+  await upsertUser(family.id, duplicateEmailUser.email, hashedPassword);
 
   for (const fixture of inviteFixtures) {
     const createdBy = usersByName.get(fixture.createdBy);

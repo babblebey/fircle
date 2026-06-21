@@ -25,6 +25,7 @@ import {
 import { normalizeEmail } from "~/lib/email"
 import { checkRateLimit, getClientIp } from "~/lib/rate-limit"
 import { getMemberSlugBase, resolveUniqueMemberSlug } from "~/lib/member-slug"
+import { findTenantUserByEmail } from "~/lib/tenant-users"
 import {
   buildInviteCreatedTemplate,
   getEmailProvider,
@@ -202,9 +203,7 @@ export const inviteRouter = createTRPCRouter({
       }
 
       // Check if email is already registered
-      const existingUser = await ctx.db.user.findUnique({
-        where: { email: input.email },
-      })
+      const existingUser = await findTenantUserByEmail(ctx.db, invite.familyId, input.email)
 
       if (existingUser) {
         throw new TRPCError({
@@ -230,6 +229,7 @@ export const inviteRouter = createTRPCRouter({
           // Create user
           const user = await tx.user.create({
             data: {
+              familyId: invite.familyId,
               email: input.email,
               password: hashedPassword,
             },
@@ -498,9 +498,7 @@ export const inviteRouter = createTRPCRouter({
         const normalizedEmail = normalizeEmail(input.invitedEmail)
 
         // Check if email is already a registered user
-        const existingUser = await ctx.db.user.findUnique({
-          where: { email: normalizedEmail },
-        })
+        const existingUser = await findTenantUserByEmail(ctx.db, input.familyId, normalizedEmail)
         if (existingUser) {
           throw new TRPCError({
             code: "CONFLICT",

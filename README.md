@@ -171,6 +171,43 @@ The setup wizard runs active readiness probes before allowing first-family boots
 
 If you change `.env` values while the dev server is running, restart `pnpm dev` before re-checking readiness so updated environment values are applied.
 
+## Tenant Domain Resolution
+
+Fircle resolves tenant context exclusively through explicit `Domain` rows.
+There is no subdomain parsing fallback and no singleton-instance fallback.
+
+### Domain mapping model
+
+- Platform-style domains are mapped explicitly (for example, `family-slug.fircle.app`)
+- Custom domains are mapped explicitly (for example, `family.example.com`)
+- Self-host root domains are mapped explicitly (for example, `localhost` or `intranet.local`)
+- Unmapped hosts always resolve to `tenant-not-found`
+
+### Custom-domain verification setup
+
+When adding a custom domain from Settings > Domain, Fircle generates a verification token.
+Create a DNS TXT record using the values shown in the UI:
+
+- Name: `_fircle-verification.<your-domain>`
+- Type: `TXT`
+- Value: `fircle-verification=<verification-token>`
+
+In production mode, unverified domains are not allowed to resolve tenant data.
+
+### Self-host root-domain behavior
+
+For self-host deployments, root/subdomain hosts must be represented in `Domain`.
+If no family exists yet, self-host instances enter bootstrap flow (`/auth/setup`).
+After setup, tenant resolution still depends on mapped domains.
+
+### Auth/invite tenant scope semantics
+
+- Account lookup is tenant-scoped (`familyId` + normalized email)
+- The same email can exist in different families without conflict
+- Invite acceptance and claim flows only conflict on existing identities inside the same tenant
+- Redirect callbacks are restricted to same-origin tenant hosts to prevent cross-tenant leakage
+- Session cookies are host-scoped (no shared cookie domain), preventing cross-subdomain session bleed
+
 ## PWA and WebAPK Verification
 
 Fircle uses a WebAPK-first PWA approach for Android Chrome installs, with iOS Safari Add to Home Screen baseline support.

@@ -84,15 +84,34 @@ enum NotificationDeliveryStatus {
 model Family {
   id          String         @id @default(cuid())
   name        String
+  slug        String         @unique
   image       String?
   description String?
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
+  users       User[]
   members     FamilyMember[]
   invites     Invite[]
+  domains     Domain[]
   notifications Notification[]
   notificationPreferences NotificationPreference[]
   pushSubscriptions PushSubscription[]
+}
+
+model Domain {
+  id                  String   @id @default(cuid())
+  familyId            String
+  domain              String   @unique
+  isPrimary           Boolean  @default(false)
+  verificationToken   String   @default("")
+  verifiedAt          DateTime?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  family Family @relation(fields: [familyId], references: [id], onDelete: Cascade)
+
+  @@index([familyId])
+  @@index([familyId, isPrimary])
 }
 
 model FamilyMember {
@@ -428,14 +447,20 @@ model Session {
 
 model User {
   id             String         @id @default(cuid())
-  email          String?        @unique
+  familyId       String?
+  email          String?
   emailVerified  DateTime?
   password       String?
   accounts       Account[]
   sessions       Session[]
+  family         Family?        @relation(fields: [familyId], references: [id], onDelete: Cascade)
   memberships    FamilyMember[]
   createdInvites Invite[]       @relation("UserCreatedInvites")
   claimedInvites Invite[]       @relation("UserClaimedInvites")
+
+  @@index([familyId])
+  @@index([email])
+  @@unique([familyId, email])
 }
 
 model VerificationToken {

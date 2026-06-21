@@ -27,6 +27,7 @@ import {
 import { getInviteExpiryDate } from "~/lib/invite"
 import { checkRateLimit, getClientIp } from "~/lib/rate-limit"
 import { getMemberSlugBase, resolveUniqueMemberSlug, slugifyMemberText } from "~/lib/member-slug"
+import { findTenantUserByEmail } from "~/lib/tenant-users"
 import {
   buildClaimLinkCreatedTemplate,
   getEmailProvider,
@@ -535,6 +536,7 @@ export const familyMemberRouter = createTRPCRouter({
           if (input.email) {
             const conflictingInvite = await tx.invite.findFirst({
               where: {
+                familyId: input.familyId,
                 type: "EMAIL_BOUND",
                 invitedEmail: input.email,
                 status: "PENDING",
@@ -845,6 +847,7 @@ export const familyMemberRouter = createTRPCRouter({
       if (input.invitedEmail) {
         const conflictingInvite = await ctx.db.invite.findFirst({
           where: {
+            familyId: member.familyId,
             type: "EMAIL_BOUND",
             invitedEmail: input.invitedEmail,
             status: "PENDING",
@@ -1113,7 +1116,7 @@ export const familyMemberRouter = createTRPCRouter({
       }
 
       // Reject if email is already registered
-      const existingUser = await ctx.db.user.findUnique({ where: { email: input.email } })
+      const existingUser = await findTenantUserByEmail(ctx.db, inv.familyId, input.email)
       if (existingUser) {
         throw new TRPCError({
           code: "CONFLICT",
@@ -1129,7 +1132,7 @@ export const familyMemberRouter = createTRPCRouter({
         claimedUserId = await ctx.db.$transaction(async (tx: Prisma.TransactionClient) => {
           // Create the user account (auth layer only — name/image live on FamilyMember)
           const user = await tx.user.create({
-            data: { email: input.email, password: hashedPassword },
+            data: { familyId: inv.familyId, email: input.email, password: hashedPassword },
           })
 
           const claimedAt = new Date()
