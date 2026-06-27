@@ -16,6 +16,11 @@ vi.mock("~/server/storage", () => ({
     buildReadUrl: ({ bucket, objectKey }: { bucket: string; objectKey: string }) =>
       `/api/media/r2/${bucket}/${objectKey}`,
   }),
+  tryGetStorageProvider: () => ({
+    driver: "r2",
+    buildReadUrl: ({ bucket, objectKey }: { bucket: string; objectKey: string }) =>
+      `/api/media/r2/${bucket}/${objectKey}`,
+  }),
 }));
 
 import { mediaRouter } from "~/server/api/routers/media";

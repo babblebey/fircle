@@ -15,6 +15,11 @@ vi.mock("~/server/storage", () => ({
     buildReadUrl: ({ bucket, objectKey }: { bucket: string; objectKey: string }) =>
       `/api/media/r2/${bucket}/${objectKey}`,
   }),
+  tryGetStorageProvider: () => ({
+    driver: "r2",
+    buildReadUrl: ({ bucket, objectKey }: { bucket: string; objectKey: string }) =>
+      `/api/media/r2/${bucket}/${objectKey}`,
+  }),
 }));
 
 vi.mock("~/server/notifications", () => ({
@@ -203,6 +208,10 @@ describe("postRouter.create", () => {
       ],
     });
 
+    if (!result) {
+      throw new Error("Expected created post response");
+    }
+
     expect(familyMemberFindUnique).toHaveBeenCalledWith(
       expect.objectContaining({
         where: {
@@ -366,6 +375,10 @@ describe("postRouter.create", () => {
       type: "TEXT",
       media: [],
     });
+
+    if (!result) {
+      throw new Error("Expected created post with mentions response");
+    }
 
     expect(postMentionCreateMany).toHaveBeenCalledWith({
       data: [
