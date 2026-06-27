@@ -25,6 +25,17 @@ Multi-tenancy is planned after the MVP is functional and validated.
 - shadcn/ui
 - PostgreSQL
 
+## Self-Hosting
+
+For a full production and local self-hosting walkthrough (PaaS-first), see:
+
+- [Self-hosting guide](docs/self-hosting.md)
+
+Related storage guides:
+
+- [Cloud storage deployment guide](docs/cloud-storage-deployment.md)
+- [Self-hosted storage migration guide](docs/self-hosted-storage-migration.md)
+
 ## Getting Started
 
 ### 1. Install dependencies
