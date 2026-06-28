@@ -27,7 +27,7 @@ Recommended baseline for single-node production:
 ### Required in all environments
 
 - DATABASE_URL
-- STORAGE_DRIVER (currently r2)
+- STORAGE_DRIVER (currently: Cloudflare R2)
 
 ### Required in production
 
@@ -70,7 +70,7 @@ Only required when EMAIL_DRIVER=zeptomail:
 
 ## 3. Production Deployment (PaaS-First)
 
-These steps apply to Railway, Render, and Fly.io style deployments.
+These steps apply to Vercel, Netlify, Railway, Render, and Fly.io style deployments.
 
 1. Provision a managed PostgreSQL database.
 2. Provision Cloudflare R2 and create an API key with bucket access.
