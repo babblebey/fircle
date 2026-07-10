@@ -7,9 +7,17 @@ import { Alert, AlertDescription, AlertTitle } from "~/components/ui/alert";
 import { AlertCircle, Camera, Loader } from "~/components/ui/icons";
 
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
+import { FamilyLogotypeLockup } from "~/components/branding/family-logotype-lockup";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
+import { Logo } from "~/components/ui/logo";
 import { Skeleton } from "~/components/ui/skeleton";
+import { tryParseBrandingConfig } from "~/lib/branding/branding-config";
+import {
+  LOGOTYPE_FONT_NAMES,
+  LOGOTYPE_FONT_PROVIDER,
+  resolveLogotypeFontName,
+} from "~/lib/branding/logotype-fonts";
 import { compressImage, createInstantPreviewUrl, resolveMediaMimeType } from "~/lib/media-compression";
 import { api } from "~/trpc/react";
 
@@ -36,6 +44,7 @@ const managementContextSchema = z.object({
       name: z.string(),
       description: z.string().nullable(),
       image: z.string().nullable(),
+      brandingConfig: z.unknown().nullable().optional(),
     })
     .nullable(),
   role: z.enum(["OWNER", "ADMIN", "MEMBER"]).nullable(),
@@ -99,6 +108,7 @@ export default function FamilySettingsPage() {
   const [selectedImagePreviewUrl, setSelectedImagePreviewUrl] = useState<string | null>(null);
   const [isPreviewConverting, setIsPreviewConverting] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [selectedLogotypeFontName, setSelectedLogotypeFontName] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
@@ -126,6 +136,18 @@ export default function FamilySettingsPage() {
   const familyId = managementContextData?.family?.id;
   const canManageFamilyIdentity =
     managementContextData?.role === "ADMIN" || managementContextData?.role === "OWNER";
+  const brandingConfig = managementContextData?.family?.brandingConfig ?? null;
+  const resolvedSelectedLogotypeFont =
+    resolveLogotypeFontName(selectedLogotypeFontName);
+  const resolvedExistingBrandingConfig = tryParseBrandingConfig(brandingConfig);
+  const hasInvalidBrandingConfig = brandingConfig !== null && resolvedExistingBrandingConfig === null;
+  const logotypeFontMetadata = useMemo(
+    () => ({
+      provider: LOGOTYPE_FONT_PROVIDER,
+      names: [...LOGOTYPE_FONT_NAMES],
+    }),
+    [],
+  );
   const previewImage = selectedImagePreviewUrl ?? familyImageUrl;
   const previewName = familyName.trim().length > 0 ? familyName : "Family";
 
@@ -135,9 +157,16 @@ export default function FamilySettingsPage() {
       return;
     }
 
+    const hydratedBrandingConfig = tryParseBrandingConfig(family.brandingConfig ?? null);
+
     setFamilyName(family.name);
     setFamilyDescription(family.description ?? "");
     setFamilyImageUrl(family.image ?? "");
+    setSelectedLogotypeFontName(
+      hydratedBrandingConfig?.logotype.enabled
+        ? (hydratedBrandingConfig.logotype.fontName ?? "")
+        : "",
+    );
     setSaveError(null);
     setIsPreviewConverting(false);
   }, [managementContextData?.family]);
@@ -296,6 +325,16 @@ export default function FamilySettingsPage() {
         description:
           normalizedFamilyDescription.length > 0 ? normalizedFamilyDescription : null,
         image: nextFamilyImageUrl.length > 0 ? nextFamilyImageUrl : null,
+        brandingConfig: resolvedSelectedLogotypeFont
+          ? {
+              version: 1,
+              logotype: {
+                enabled: true,
+                fontName: resolvedSelectedLogotypeFont,
+                fontProvider: LOGOTYPE_FONT_PROVIDER,
+              },
+            }
+          : null,
       });
 
       await trpcUtils.invite.getManagementContext.invalidate();
@@ -452,6 +491,75 @@ export default function FamilySettingsPage() {
               disabled={isSaving || !canManageFamilyIdentity || !familyId}
             />
             <p className="text-muted-foreground text-xs">{familyDescription.length}/500</p>
+          </div>
+
+          <div className="space-y-3 rounded-2xl border bg-muted/10 p-4">
+            <div className="space-y-1">
+              <p className="font-medium text-sm">Family logotype</p>
+              <p className="text-muted-foreground text-xs">
+                Choose a style for how your family name appears across your space.
+              </p>
+            </div>
+
+            <div className="space-y-1.5">
+              <label htmlFor="family-logotype-font" className="text-sm font-medium">
+                Style
+              </label>
+              <select
+                id="family-logotype-font"
+                value={selectedLogotypeFontName}
+                onChange={(event) => {
+                  setSelectedLogotypeFontName(event.target.value);
+                  setSaveError(null);
+                  setSaveSuccess(null);
+                }}
+                className="block h-10 w-full rounded-2xl border border-input bg-background px-3 text-sm text-foreground shadow-xs outline-none transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={isSaving || !canManageFamilyIdentity || !familyId}
+              >
+                <option value="">Use default Fircle lockup (disable custom logotype)</option>
+                {logotypeFontMetadata.names.map((fontName) => (
+                  <option key={fontName} value={fontName}>
+                    {fontName}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-2 rounded-xl border bg-card/80 p-4">
+              <p className="text-muted-foreground text-xs">Live preview</p>
+              <div className="inline-flex max-w-full items-center gap-2 rounded-lg border bg-background px-3 py-3 text-base sm:gap-3 sm:px-5 sm:py-4 sm:text-lg">
+              {resolvedSelectedLogotypeFont ? (
+                <FamilyLogotypeLockup
+                  familyName={previewName}
+                  fontName={resolvedSelectedLogotypeFont}
+                  className="px-3 sm:px-6"
+                  familyNameClassName="text-5xl sm:text-7xl"
+                  leadingClassName="text-sm sm:text-base"
+                  trailingClassName="text-sm sm:text-base translate-y-[70%] sm:translate-y-[95%]"
+                />
+              ) : (
+                <>
+                  <span className="flex items-center gap-3 sm:gap-4">
+                    <Logo className="h-6 w-auto text-foreground sm:h-8" aria-hidden="true" />
+                    <span className="font-semibold text-xl leading-none tracking-tight sm:text-2xl">Fircle</span>
+                  </span>
+                  <span className="text-muted-foreground text-xs sm:text-sm">Default fallback preview</span>
+                </>
+                )}
+              </div>
+            </div>
+
+            {hasInvalidBrandingConfig ? (
+              <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-amber-700 text-xs dark:text-amber-200">
+                Your saved logotype configuration is invalid or uses a font outside the allowlist. Choose a new allowlisted font and save to fix it.
+              </p>
+            ) : null}
+
+            {!resolvedSelectedLogotypeFont ? (
+              <p className="text-muted-foreground text-xs">
+                Custom logotype is disabled. Navigation surfaces will use the fallback Fircle lockup.
+              </p>
+            ) : null}
           </div>
 
           {saveError ? (
