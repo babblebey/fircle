@@ -17,6 +17,7 @@ import {
 import { z } from "zod";
 
 import { Button } from "~/components/ui/button";
+import { Badge } from "~/components/ui/badge";
 import { Input } from "~/components/ui/input";
 import { cn } from "~/lib/utils";
 import { api } from "~/trpc/react";
@@ -38,6 +39,14 @@ const inviteListItemSchema = z.object({
   id: z.string(),
   code: z.string(),
   type: z.enum(["OPEN", "EMAIL_BOUND"]),
+  isClaimInvite: z.boolean(),
+  claimMember: z
+    .object({
+      id: z.string(),
+      name: z.string(),
+      slug: z.string(),
+    })
+    .nullable(),
   invitedEmail: z.string().nullable(),
   status: z.enum(["PENDING", "CLAIMED", "EXPIRED", "REVOKED"]),
   lifecycleState: z.enum(["valid", "expired", "claimed", "revoked"]),
@@ -103,16 +112,22 @@ function buildInviteLink(code: string) {
   return new URL(`/auth/invite/${code}`, window.location.origin).toString();
 }
 
+function buildPendingInviteLink(code: string, isClaimInvite: boolean) {
+  const path = isClaimInvite ? `/auth/claim/${code}` : `/auth/invite/${code}`;
+
+  if (typeof window === "undefined") {
+    return path;
+  }
+
+  return new URL(path, window.location.origin).toString();
+}
+
 function formatStatus(status: LifecycleState) {
   if (status === "valid") {
     return "Pending";
   }
 
   return status[0]!.toUpperCase() + status.slice(1);
-}
-
-function formatInviteType(type: "OPEN" | "EMAIL_BOUND") {
-  return type === "EMAIL_BOUND" ? "Email-bound" : "Open";
 }
 
 function formatDate(value: Date | string | null) {
@@ -507,62 +522,77 @@ export default function InvitesPage() {
         ) : (
           <ul className="space-y-3">
             {visiblePendingInvites.map((invite) => {
-              const inviteLink = buildInviteLink(invite.code);
+              const inviteLink = buildPendingInviteLink(invite.code, invite.isClaimInvite);
               const copyKey = `pending:${invite.id}`;
+              const purposeLabel = invite.isClaimInvite ? "Claim link" : "Open invite";
+              const claimForLabel = invite.claimMember?.name ?? "Profile unavailable";
 
               return (
                 <li key={invite.id} className="space-y-3 rounded-xl border bg-background p-4">
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                    <div className="space-y-1.5">
-                      <div className="flex flex-wrap items-center gap-2 text-xs">
-                        <span className="rounded-full border bg-muted px-2 py-0.5 text-muted-foreground">
-                          {formatInviteType(invite.type)} invite
+                  <div className="space-y-2">
+                    <div className="flex flex-wrap items-center gap-2 text-xs">
+                      <Badge variant="outline" className="bg-muted text-muted-foreground">
+                        {purposeLabel}
+                      </Badge>
+                      {invite.type === "EMAIL_BOUND" ? (
+                        <Badge variant="outline" className="bg-muted text-muted-foreground">
+                          Email-bound
+                        </Badge>
+                      ) : null}
+                      {invite.isClaimInvite ? (
+                        <span className="text-muted-foreground">
+                          For {claimForLabel}
                         </span>
-                        {invite.type === "EMAIL_BOUND" ? (
-                          <span className="text-muted-foreground">
-                            {invite.invitedEmail ?? "No email specified"}
-                          </span>
-                        ) : null}
-                      </div>
-                      <p className="break-all font-mono text-xs">
-                        <span className="text-muted-foreground text-xs">Invite link: </span>
-                        {inviteLink}
-                      </p>
-                      <p className="text-muted-foreground text-xs">
-                        Created by {invite.createdBy.name ?? invite.createdBy.email ?? "Unknown"} · Expires {formatDate(invite.expiresAt)}
-                      </p>
+                      ) : null}
+                      {invite.type === "EMAIL_BOUND" && invite.invitedEmail ? (
+                        <span className="text-muted-foreground">
+                          {invite.invitedEmail}
+                        </span>
+                      ) : null}
                     </div>
 
-                    <div className="flex items-center gap-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => copyText(copyKey, inviteLink)}
-                      >
-                        {copyFeedbackKey === copyKey ? (
-                          <>
-                            <Check className="mr-1 size-4" />
-                            Copied
-                          </>
-                        ) : (
-                          <>
-                            <Link2 className="mr-1 size-4" />
-                            Copy link
-                          </>
-                        )}
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="border-destructive/40 text-destructive hover:bg-destructive/10"
-                        onClick={() => setRevokingInviteId(invite.id)}
+                    <div className="relative overflow-hidden rounded-xl border bg-muted/20 pr-[12.5rem]">
+                      <div className="overflow-x-auto scrollbar px-3 py-3 font-mono text-xs whitespace-nowrap">
+                        {inviteLink}
+                      </div>
+
+                      <div className="pointer-events-none absolute inset-y-0 right-0 w-16 bg-gradient-to-l from-background to-transparent" />
+
+                      <div className="absolute top-1/2 right-1 flex -translate-y-1/2 items-center gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => copyText(copyKey, inviteLink)}
+                        >
+                          {copyFeedbackKey === copyKey ? (
+                            <>
+                              <Check className="mr-1 size-4" />
+                              Copied
+                            </>
+                          ) : (
+                            <>
+                              <Link2 className="mr-1 size-4" />
+                              Copy link
+                            </>
+                          )}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="border-destructive/40 text-destructive hover:bg-destructive/10"
+                          onClick={() => setRevokingInviteId(invite.id)}
                           disabled={revokeInvite.isPending}
-                      >
-                        Revoke
-                      </Button>
+                        >
+                          Revoke
+                        </Button>
+                      </div>
                     </div>
+
+                    <p className="text-muted-foreground text-xs">
+                      Created by {invite.createdBy.name ?? invite.createdBy.email ?? "Unknown"} · Expires {formatDate(invite.expiresAt)}
+                    </p>
                   </div>
 
                   {revokingInviteId === invite.id ? (

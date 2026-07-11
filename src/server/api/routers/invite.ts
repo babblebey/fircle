@@ -575,6 +575,7 @@ export const inviteRouter = createTRPCRouter({
         include: {
           createdBy: { select: { id: true, email: true } },
           claimedBy: { select: { id: true, email: true } },
+          claimMember: { select: { id: true, name: true, slug: true } },
         },
         orderBy: { createdAt: "desc" },
       })
@@ -585,6 +586,14 @@ export const inviteRouter = createTRPCRouter({
         id: inv.id,
         code: inv.code,
         type: inv.type,
+        isClaimInvite: inv.claimMemberId !== null,
+        claimMember: inv.claimMember
+          ? {
+              id: inv.claimMember.id,
+              name: inv.claimMember.name,
+              slug: inv.claimMember.slug,
+            }
+          : null,
         invitedEmail: inv.invitedEmail,
         status: inv.status,
         lifecycleState: getInviteLifecycleState({
