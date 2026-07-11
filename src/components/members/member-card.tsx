@@ -33,11 +33,13 @@ export function MemberCard({ member }: MemberCardProps) {
         </Avatar>
 
         <div className="min-w-0 flex-1 space-y-2">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="truncate font-medium text-sm sm:text-base">{member.name}</p>
+          <div className="flex items-center justify-between gap-2">
+            <p className="min-w-0 truncate font-medium text-sm sm:text-base">{member.name}</p>
             <MemberStatusBadge
               status={member.status}
               hasPendingClaimInvite={hasPendingInvite}
+              labelVisibility="hover"
+              className="shrink-0"
             />
           </div>
 
