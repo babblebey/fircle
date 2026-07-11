@@ -25,7 +25,7 @@ export default function MembersPage() {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<MemberFilter>("all");
 
-  const managementContext = api.invite.getManagementContext.useQuery(undefined, {
+  const managementContext = api.family.getManagementContext.useQuery(undefined, {
     retry: false,
     refetchOnWindowFocus: false,
   });

@@ -91,7 +91,7 @@ export default function AddMemberPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const avatarPreviewSelectionRef = useRef(0);
 
-  const managementContext = api.invite.getManagementContext.useQuery(undefined, {
+  const managementContext = api.family.getManagementContext.useQuery(undefined, {
     retry: false,
     refetchOnWindowFocus: false,
   });

@@ -1,5 +1,18 @@
 import { describe, expect, it, vi } from "vitest";
 
+const mockedEnv = vi.hoisted(() => ({
+  DATABASE_URL: "postgresql://user:pass@localhost:5432/fircle_test",
+  SELF_HOSTED: true,
+  STORAGE_DRIVER: "r2",
+  NODE_ENV: "test",
+  EMAIL_FROM_ADDRESS: "no-reply@example.com",
+  EMAIL_FROM_NAME: "Fircle",
+}));
+
+vi.mock("~/env", () => ({
+  env: mockedEnv,
+}));
+
 vi.mock("server-only", () => ({}));
 
 vi.mock("~/server/auth", () => ({

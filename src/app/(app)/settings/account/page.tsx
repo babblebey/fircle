@@ -142,7 +142,7 @@ export default function AccountSettingsPage() {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isProfileSaving, setIsProfileSaving] = useState(false);
 
-  const managementContext = api.invite.getManagementContext.useQuery(undefined, {
+  const managementContext = api.family.getManagementContext.useQuery(undefined, {
     retry: false,
     refetchOnWindowFocus: false,
   });

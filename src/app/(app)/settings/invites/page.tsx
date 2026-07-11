@@ -146,7 +146,7 @@ export default function InvitesPage() {
   } | null>(null);
   const [createdInviteId, setCreatedInviteId] = useState<string | null>(null);
 
-  const managementContext = api.invite.getManagementContext.useQuery(undefined, {
+  const managementContext = api.family.getManagementContext.useQuery(undefined, {
     retry: false,
     refetchOnWindowFocus: false,
   });

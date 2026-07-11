@@ -50,7 +50,7 @@ export default function GalleryPage() {
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const lastAppliedCursorRef = useRef<string | null>(null);
 
-  const managementContext = api.invite.getManagementContext.useQuery(undefined, {
+  const managementContext = api.family.getManagementContext.useQuery(undefined, {
     retry: false,
     refetchOnWindowFocus: false,
   });

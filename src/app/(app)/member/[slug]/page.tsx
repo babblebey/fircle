@@ -117,7 +117,7 @@ export default function MemberProfilePage() {
   const params = useParams<{ slug: string }>();
   const [activeTab, setActiveTab] = useState<ProfileTab>("posts");
 
-  const managementContext = api.invite.getManagementContext.useQuery(undefined, {
+  const managementContext = api.family.getManagementContext.useQuery(undefined, {
     retry: false,
     refetchOnWindowFocus: false,
   });

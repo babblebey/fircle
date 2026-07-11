@@ -29,7 +29,7 @@ export default function NotificationsPage() {
   const initialReadStateRef = useRef<Map<string, boolean> | null>(null);
   const trpcUtils = api.useUtils();
 
-  const managementContext = api.invite.getManagementContext.useQuery(undefined, {
+  const managementContext = api.family.getManagementContext.useQuery(undefined, {
     retry: false,
     refetchOnWindowFocus: false,
   });

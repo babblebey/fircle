@@ -52,7 +52,7 @@ export function MobileHeader({ primaryLockup: _primaryLockup }: { primaryLockup:
   const pathname = usePathname();
   const shouldPollUnread = !pathname.startsWith("/notifications");
 
-  const managementContext = api.invite.getManagementContext.useQuery(undefined, {
+  const managementContext = api.family.getManagementContext.useQuery(undefined, {
     retry: false,
     refetchOnWindowFocus: false,
   });

@@ -116,7 +116,7 @@ export default function FamilySettingsPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imagePreviewSelectionRef = useRef(0);
 
-  const managementContext = api.invite.getManagementContext.useQuery(undefined, {
+  const managementContext = api.family.getManagementContext.useQuery(undefined, {
     retry: false,
     refetchOnWindowFocus: false,
   });
@@ -130,7 +130,7 @@ export default function FamilySettingsPage() {
     ? parsedManagementContext.data
     : null;
 
-  const updateFamilyIdentity = api.invite.updateFamilyIdentity.useMutation();
+  const updateFamilyIdentity = api.family.updateFamilyIdentity.useMutation();
   const trpcUtils = api.useUtils();
 
   const familyId = managementContextData?.family?.id;
@@ -337,7 +337,7 @@ export default function FamilySettingsPage() {
           : null,
       });
 
-      await trpcUtils.invite.getManagementContext.invalidate();
+      await trpcUtils.family.getManagementContext.invalidate();
 
       if (selectedImagePreviewUrl) {
         URL.revokeObjectURL(selectedImagePreviewUrl);

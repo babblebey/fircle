@@ -16,7 +16,7 @@ export function GlobalComposerProvider({ children }: { children: React.ReactNode
   const [composerOpen, setComposerOpen] = useState(false);
   const [composerMode, setComposerMode] = useState<ComposerOpenMode | undefined>(undefined);
 
-  const managementContext = api.invite.getManagementContext.useQuery(undefined, {
+  const managementContext = api.family.getManagementContext.useQuery(undefined, {
     retry: false,
     refetchOnWindowFocus: false,
   });

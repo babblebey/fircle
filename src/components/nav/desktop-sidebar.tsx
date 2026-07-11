@@ -46,7 +46,7 @@ export function DesktopSidebar({ primaryLockup }: { primaryLockup: string }) {
   const { openComposer } = useGlobalComposer();
   const shouldPollUnread = !pathname.startsWith("/notifications");
 
-  const managementContext = api.invite.getManagementContext.useQuery(undefined, {
+  const managementContext = api.family.getManagementContext.useQuery(undefined, {
     retry: false,
     refetchOnWindowFocus: false,
   });

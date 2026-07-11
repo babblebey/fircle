@@ -1,5 +1,6 @@
 import { domainRouter } from "~/server/api/routers/domain";
 import { ffeaturesRouter } from "~/server/api/routers/ffeatures";
+import { familyRouter } from "~/server/api/routers/family";
 import { integrationRouter } from "~/server/api/routers/integration";
 import { familyMemberRouter } from "~/server/api/routers/family-member";
 import { inviteRouter } from "~/server/api/routers/invite";
@@ -18,6 +19,7 @@ import { createCallerFactory, createTRPCRouter } from "~/server/api/trpc";
 export const appRouter = createTRPCRouter({
   domain: domainRouter,
   ffeatures: ffeaturesRouter,
+  family: familyRouter,
   familyMember: familyMemberRouter,
   integration: integrationRouter,
   invite: inviteRouter,

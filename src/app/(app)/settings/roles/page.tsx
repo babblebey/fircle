@@ -64,7 +64,7 @@ function PermissionCell({ value }: { value: boolean }) {
 }
 
 export default function RolesPage() {
-  const managementContext = api.invite.getManagementContext.useQuery(undefined, {
+  const managementContext = api.family.getManagementContext.useQuery(undefined, {
     retry: false,
     refetchOnWindowFocus: false,
   });

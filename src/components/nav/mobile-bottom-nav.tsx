@@ -59,7 +59,7 @@ export function MobileBottomNav({ currentUser }: MobileBottomNavProps) {
   const pathname = usePathname();
   const { openComposer } = useGlobalComposer();
 
-  const managementContext = api.invite.getManagementContext.useQuery(undefined, {
+  const managementContext = api.family.getManagementContext.useQuery(undefined, {
     retry: false,
     refetchOnWindowFocus: false,
   });

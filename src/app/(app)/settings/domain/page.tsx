@@ -20,7 +20,7 @@ export default function DomainSettingsPage() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const utils = api.useUtils();
 
-  const managementContext = api.invite.getManagementContext.useQuery(undefined, {
+  const managementContext = api.family.getManagementContext.useQuery(undefined, {
     retry: false,
     refetchOnWindowFocus: false,
   });

@@ -108,7 +108,7 @@ export default function ProfilePage() {
   const [activeTab, setActiveTab] = useState<ProfileTab>("posts");
 
   // Get the authenticated user's family context
-  const managementContext = api.invite.getManagementContext.useQuery(undefined, {
+  const managementContext = api.family.getManagementContext.useQuery(undefined, {
     retry: false,
     refetchOnWindowFocus: false,
   });

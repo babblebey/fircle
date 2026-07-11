@@ -169,7 +169,7 @@ function FeedSkeletonList() {
 }
 
 export default function FeedPage() {
-  const managementContext = api.invite.getManagementContext.useQuery(undefined, {
+  const managementContext = api.family.getManagementContext.useQuery(undefined, {
     retry: false,
     refetchOnWindowFocus: false,
   });

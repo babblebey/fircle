@@ -19,7 +19,7 @@ export function MembershipGuard({
 }) {
   const signOutTriggered = useRef(false);
 
-  const managementContext = api.invite.getManagementContext.useQuery(undefined, {
+  const managementContext = api.family.getManagementContext.useQuery(undefined, {
     retry: false,
     refetchOnWindowFocus: false,
   });

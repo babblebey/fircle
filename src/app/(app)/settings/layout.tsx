@@ -44,7 +44,7 @@ export default function SettingsLayout({
 }) {
   const router = useRouter();
   const pathname = usePathname();
-  const managementContext = api.invite.getManagementContext.useQuery(undefined, {
+  const managementContext = api.family.getManagementContext.useQuery(undefined, {
     retry: false,
     refetchOnWindowFocus: false,
   });
