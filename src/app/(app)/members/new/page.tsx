@@ -70,6 +70,7 @@ export default function AddMemberPage() {
   const [memberName, setMemberName] = useState("");
   const [memberNickname, setMemberNickname] = useState("");
   const [memberEmail, setMemberEmail] = useState("");
+  const [shouldGenerateInvite, setShouldGenerateInvite] = useState(false);
   const [autoClaimInvite, setAutoClaimInvite] = useState<{
     code: string;
     invitedEmail: string | null;
@@ -101,6 +102,8 @@ export default function AddMemberPage() {
     managementContext.data?.role === "OWNER" || managementContext.data?.role === "ADMIN";
   const showPermissionDenied =
     !managementContext.isLoading && selectedFamilyId && !canManageMembers;
+  const hasEmail = memberEmail.trim().length > 0;
+  const shouldGenerateInviteNow = hasEmail || shouldGenerateInvite;
 
   useEffect(() => {
     if (showPermissionDenied) {
@@ -200,6 +203,7 @@ export default function AddMemberPage() {
     const normalizedName = memberName.trim();
     const normalizedNickname = memberNickname.trim();
     const normalizedEmail = memberEmail.trim();
+    const generateClaimInvite = normalizedEmail.length > 0 || shouldGenerateInvite;
 
     if (!normalizedName) {
       setFormError("Member name is required.");
@@ -220,6 +224,7 @@ export default function AddMemberPage() {
         name: normalizedName,
         nickname: normalizedNickname.length > 0 ? normalizedNickname : undefined,
         email: normalizedEmail.length > 0 ? normalizedEmail : undefined,
+        generateClaimInvite,
       });
 
       if (selectedAvatarFile) {
@@ -292,6 +297,7 @@ export default function AddMemberPage() {
     setMemberName("");
     setMemberNickname("");
     setMemberEmail("");
+    setShouldGenerateInvite(false);
     setAutoClaimInvite(null);
     setIsClaimLinkCopied(false);
     setEmailDelivery(null);
@@ -539,7 +545,7 @@ export default function AddMemberPage() {
                   !canManageMembers
                 }
               />
-              {memberEmail.trim().length > 0 ? (
+              {hasEmail ? (
                 <p className="text-xs text-muted-foreground">
                   A claim invite link will be created automatically and bound to this email.
                 </p>
@@ -614,6 +620,32 @@ export default function AddMemberPage() {
                   <p className="text-xs text-muted-foreground">Uploading photo: {uploadProgress}%</p>
                 </div>
               ) : null}
+            </div>
+
+            <div className="space-y-2 sm:col-span-2">
+              <label className="flex items-start gap-2 rounded-xl border bg-muted/20 p-3 text-sm" htmlFor="generate-claim-invite">
+                <input
+                  id="generate-claim-invite"
+                  type="checkbox"
+                  className="mt-0.5"
+                  checked={shouldGenerateInviteNow}
+                  onChange={(event) => setShouldGenerateInvite(event.target.checked)}
+                  disabled={
+                    isSaving ||
+                    managementContext.isLoading ||
+                    !selectedFamilyId ||
+                    !canManageMembers ||
+                    hasEmail
+                  }
+                />
+                <span className="space-y-1">
+                  <span className="block font-medium">Generate invite link now</span>
+                  <span className="block text-xs text-muted-foreground">
+                    Create a claim link immediately after adding this member.
+                    {hasEmail ? " Required because an email is provided." : ""}
+                  </span>
+                </span>
+              </label>
             </div>
           </div>
 

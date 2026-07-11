@@ -623,7 +623,9 @@ export const familyMemberRouter = createTRPCRouter({
             },
           })
 
-          if (!input.email) {
+          const shouldCreateClaimInvite = Boolean(input.email) || Boolean(input.generateClaimInvite)
+
+          if (!shouldCreateClaimInvite) {
             return {
               member,
               claimInvite: null,
@@ -650,11 +652,11 @@ export const familyMemberRouter = createTRPCRouter({
           const invite = await tx.invite.create({
             data: {
               code,
-              type: "EMAIL_BOUND",
+              type: input.email ? "EMAIL_BOUND" : "OPEN",
               status: "PENDING",
               familyId: input.familyId,
               claimMemberId: member.id,
-              invitedEmail: input.email,
+              invitedEmail: input.email ?? null,
               createdById: ctx.session.user.id,
               expiresAt: getInviteExpiryDate(new Date(), CLAIM_DEFAULT_TTL_DAYS),
             },

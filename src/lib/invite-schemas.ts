@@ -82,6 +82,8 @@ export const createUnclaimedMemberInputSchema = z.object({
     .email()
     .transform(normalizeEmail)
     .optional(),
+  /** When true and email is not provided, create an OPEN claim invite automatically. */
+  generateClaimInvite: z.boolean().optional(),
   /** Optional URL for the member's profile image. */
   image: memberImageInputSchema.optional(),
 })
