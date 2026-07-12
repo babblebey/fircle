@@ -4,7 +4,12 @@ import type { StorageProvider } from "~/server/storage";
 import { getStorageProvider, tryGetStorageProvider } from "~/server/storage";
 import { checkRateLimit } from "~/lib/rate-limit";
 import type { db as appDb } from "~/server/db";
-import { createNotifications, getClaimedMemberIds, dispatchPushForNotifications } from "~/server/notifications";
+import {
+  createNotifications,
+  getClaimedMemberIds,
+  dispatchPushForNotifications,
+  resolveClaimedMentionRecipientIds,
+} from "~/server/notifications";
 
 import {
   createTRPCRouter,
@@ -17,11 +22,27 @@ const MAX_MENTIONS_PER_ENTITY = 20;
 
 type CreatedNotifications = Awaited<ReturnType<typeof createNotifications>>;
 
-const mentionInputSchema = z.object({
-  memberId: z.string().cuid(),
+const mentionRangeInputSchema = z.object({
   start: z.number().int().min(0),
   end: z.number().int().min(1),
 });
+
+const memberMentionInputSchema = mentionRangeInputSchema
+  .extend({
+    kind: z.literal("MEMBER").optional(),
+    memberId: z.string().cuid(),
+  })
+  .transform(({ kind: _kind, ...rest }) => ({
+    ...rest,
+    kind: "MEMBER" as const,
+  }));
+
+const allMentionInputSchema = mentionRangeInputSchema.extend({
+  kind: z.literal("ALL"),
+});
+
+const mentionInputSchema = z.union([memberMentionInputSchema, allMentionInputSchema]);
+type MentionInput = z.infer<typeof mentionInputSchema>;
 
 function isAbsoluteUrl(value: string) {
   try {
@@ -69,6 +90,12 @@ export const createPostInputSchema = z
       .default([]),
   })
   .superRefine((input, ctx) => {
+    validateAllMentionUsage({
+      mentions: input.mentions,
+      ctx,
+      path: ["mentions"],
+    });
+
     validateMentionRanges({
       text: input.caption?.trim() ?? "",
       mentions: input.mentions,
@@ -155,6 +182,12 @@ export const createCommentInputSchema = z
     parentCommentId: z.string().cuid().optional(),
   })
   .superRefine((input, ctx) => {
+    validateAllMentionUsage({
+      mentions: input.mentions,
+      ctx,
+      path: ["mentions"],
+    });
+
     validateMentionRanges({
       text: input.content,
       mentions: input.mentions,
@@ -179,6 +212,12 @@ export const updateCommentInputSchema = z
     mentions: z.array(mentionInputSchema).max(MAX_MENTIONS_PER_ENTITY).default([]),
   })
   .superRefine((input, ctx) => {
+    validateAllMentionUsage({
+      mentions: input.mentions,
+      ctx,
+      path: ["mentions"],
+    });
+
     validateMentionRanges({
       text: input.content,
       mentions: input.mentions,
@@ -199,7 +238,7 @@ export const toggleCommentLikeInputSchema = z.object({
 
 function validateMentionRanges(input: {
   text: string;
-  mentions: Array<z.infer<typeof mentionInputSchema>>;
+  mentions: MentionInput[];
   ctx: z.RefinementCtx;
   path: (string | number)[];
 }) {
@@ -239,6 +278,56 @@ function validateMentionRanges(input: {
     }
 
     previousEnd = mention.end;
+  }
+}
+
+function validateAllMentionUsage(input: {
+  mentions: MentionInput[];
+  ctx: z.RefinementCtx;
+  path: (string | number)[];
+}) {
+  const allMentionIndexes = input.mentions
+    .map((mention, index) => ({ mention, index }))
+    .filter((item) => item.mention.kind === "ALL")
+    .map((item) => item.index);
+
+  if (allMentionIndexes.length <= 1) {
+    return;
+  }
+
+  for (const index of allMentionIndexes.slice(1)) {
+    input.ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: [...input.path, index, "kind"],
+      message: "Only one @all mention is allowed per post or comment",
+    });
+  }
+}
+
+function getMentionedMemberIds(mentions: MentionInput[]) {
+  return mentions
+    .filter((mention): mention is Extract<MentionInput, { kind: "MEMBER" }> => mention.kind === "MEMBER")
+    .map((mention) => mention.memberId);
+}
+
+function hasAllMention(mentions: MentionInput[]) {
+  return mentions.some((mention) => mention.kind === "ALL");
+}
+
+function assertAllMentionPermission(input: {
+  mentions: MentionInput[];
+  role?: "OWNER" | "ADMIN" | "MEMBER";
+}) {
+  if (!hasAllMention(input.mentions)) {
+    return;
+  }
+
+  const isOwnerOrAdmin = input.role === "OWNER" || input.role === "ADMIN";
+  if (!isOwnerOrAdmin) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "Only owners and admins can use @all mentions",
+    });
   }
 }
 
@@ -399,7 +488,8 @@ type MediaTagRecord = {
 
 type PostMentionRecord = {
   id: string;
-  mentionedMemberId: string;
+  kind: "MEMBER" | "ALL";
+  mentionedMemberId: string | null;
   start: number;
   end: number;
   mentionedMember: {
@@ -407,12 +497,13 @@ type PostMentionRecord = {
     name: string;
     slug: string;
     image: string | null;
-  };
+  } | null;
 };
 
 type CommentMentionRecord = {
   id: string;
-  mentionedMemberId: string;
+  kind: "MEMBER" | "ALL";
+  mentionedMemberId: string | null;
   start: number;
   end: number;
   mentionedMember: {
@@ -420,7 +511,7 @@ type CommentMentionRecord = {
     name: string;
     slug: string;
     image: string | null;
-  };
+  } | null;
 };
 
 function mapMediaTagResponse(tag: MediaTagRecord) {
@@ -446,8 +537,26 @@ function mapMediaTagResponse(tag: MediaTagRecord) {
 }
 
 function mapPostMentionResponse(mention: PostMentionRecord) {
+  if (mention.kind === "ALL") {
+    return {
+      id: mention.id,
+      kind: "ALL" as const,
+      start: mention.start,
+      end: mention.end,
+      member: null,
+    };
+  }
+
+  if (!mention.mentionedMember) {
+    throw new TRPCError({
+      code: "INTERNAL_SERVER_ERROR",
+      message: "Missing mentioned member for MEMBER post mention",
+    });
+  }
+
   return {
     id: mention.id,
+    kind: "MEMBER" as const,
     start: mention.start,
     end: mention.end,
     member: {
@@ -460,8 +569,26 @@ function mapPostMentionResponse(mention: PostMentionRecord) {
 }
 
 function mapCommentMentionResponse(mention: CommentMentionRecord) {
+  if (mention.kind === "ALL") {
+    return {
+      id: mention.id,
+      kind: "ALL" as const,
+      start: mention.start,
+      end: mention.end,
+      member: null,
+    };
+  }
+
+  if (!mention.mentionedMember) {
+    throw new TRPCError({
+      code: "INTERNAL_SERVER_ERROR",
+      message: "Missing mentioned member for MEMBER comment mention",
+    });
+  }
+
   return {
     id: mention.id,
+    kind: "MEMBER" as const,
     start: mention.start,
     end: mention.end,
     member: {
@@ -491,6 +618,7 @@ function postResponseSelect(currentViewerMemberId: string) {
       orderBy: [{ start: "asc" as const }, { id: "asc" as const }],
       select: {
         id: true,
+        kind: true,
         mentionedMemberId: true,
         start: true,
         end: true,
@@ -669,6 +797,7 @@ type CommentResponse = {
   };
   mentions: Array<{
     id: string;
+    kind: "MEMBER" | "ALL";
     start: number;
     end: number;
     member: {
@@ -676,7 +805,7 @@ type CommentResponse = {
       name: string;
       slug: string;
       avatarUrl: string;
-    };
+    } | null;
   }>;
   likedByCurrentUser: boolean;
   likeCount: number;
@@ -726,6 +855,7 @@ function commentResponseSelect(currentViewerMemberId: string) {
       orderBy: [{ start: "asc" as const }, { id: "asc" as const }],
       select: {
         id: true,
+        kind: true,
         mentionedMemberId: true,
         start: true,
         end: true,
@@ -759,9 +889,9 @@ function commentResponseSelect(currentViewerMemberId: string) {
 async function assertMentionMembersBelongToFamily(input: {
   db: typeof appDb;
   familyId: string;
-  mentions: Array<z.infer<typeof mentionInputSchema>>;
+  mentions: MentionInput[];
 }) {
-  const memberIds = Array.from(new Set(input.mentions.map((mention) => mention.memberId)));
+  const memberIds = Array.from(new Set(getMentionedMemberIds(input.mentions)));
   if (memberIds.length === 0) {
     return;
   }
@@ -799,6 +929,7 @@ async function requireFamilyMembership(familyId: string, userId: string, db: typ
       familyId: true,
       name: true,
       image: true,
+      role: true,
     },
   });
 
@@ -827,6 +958,11 @@ export const postRouter = createTRPCRouter({
         db: ctx.db,
         familyId: input.familyId,
         mentions: input.mentions,
+      });
+
+      assertAllMentionPermission({
+        mentions: input.mentions,
+        role: membership.role,
       });
 
       const { result, createdNotifications } = await ctx.db.$transaction(async (tx) => {
@@ -864,20 +1000,21 @@ export const postRouter = createTRPCRouter({
           await tx.postMention.createMany({
             data: input.mentions.map((mention) => ({
               postId: post.id,
-              mentionedMemberId: mention.memberId,
+              kind: mention.kind,
+              mentionedMemberId: mention.kind === "MEMBER" ? mention.memberId : null,
               start: mention.start,
               end: mention.end,
             })),
           });
 
-          const claimedMentionedMemberIds = await getClaimedMemberIds(
-            tx,
-            input.familyId,
-            input.mentions.map((mention) => mention.memberId),
-          );
+          const mentionRecipientIds = await resolveClaimedMentionRecipientIds(tx, {
+            familyId: input.familyId,
+            actorMemberId: membership.id,
+            directMemberIds: getMentionedMemberIds(input.mentions),
+            includeAll: hasAllMention(input.mentions),
+          });
 
-          const mentionSeeds = claimedMentionedMemberIds
-            .filter((memberId) => memberId !== membership.id)
+          const mentionSeeds = mentionRecipientIds
             .map((memberId) => ({
               familyId: input.familyId,
               recipientMemberId: memberId,
@@ -1186,6 +1323,11 @@ export const postRouter = createTRPCRouter({
         mentions: input.mentions,
       });
 
+      assertAllMentionPermission({
+        mentions: input.mentions,
+        role: membership.role,
+      });
+
       const rateLimit = checkRateLimit(`comment:create:${membership.id}`, 50, 60_000);
       if (!rateLimit.ok) {
         throw new TRPCError({
@@ -1261,7 +1403,8 @@ export const postRouter = createTRPCRouter({
             await tx.commentMention.createMany({
               data: input.mentions.map((mention) => ({
                 commentId: comment.id,
-                mentionedMemberId: mention.memberId,
+                kind: mention.kind,
+                mentionedMemberId: mention.kind === "MEMBER" ? mention.memberId : null,
                 start: mention.start,
                 end: mention.end,
               })),
@@ -1279,16 +1422,14 @@ export const postRouter = createTRPCRouter({
               body: string;
             }> = [];
 
-            const claimedMentionedMemberIds = await getClaimedMemberIds(
-              tx,
-              input.familyId,
-              input.mentions.map((mention) => mention.memberId),
-            );
+            const mentionRecipientIds = await resolveClaimedMentionRecipientIds(tx, {
+              familyId: input.familyId,
+              actorMemberId: membership.id,
+              directMemberIds: getMentionedMemberIds(input.mentions),
+              includeAll: hasAllMention(input.mentions),
+            });
 
-            for (const memberId of claimedMentionedMemberIds) {
-              if (memberId === membership.id) {
-                continue;
-              }
+            for (const memberId of mentionRecipientIds) {
 
               notificationSeeds.push({
                 familyId: input.familyId,
@@ -1545,6 +1686,11 @@ export const postRouter = createTRPCRouter({
         mentions: input.mentions,
       });
 
+      assertAllMentionPermission({
+        mentions: input.mentions,
+        role: membership.role,
+      });
+
       const comment = await ctx.db.comment.findFirst({
         where: {
           id: input.commentId,
@@ -1599,20 +1745,21 @@ export const postRouter = createTRPCRouter({
           await tx.commentMention.createMany({
             data: input.mentions.map((mention) => ({
               commentId: comment.id,
-              mentionedMemberId: mention.memberId,
+              kind: mention.kind,
+              mentionedMemberId: mention.kind === "MEMBER" ? mention.memberId : null,
               start: mention.start,
               end: mention.end,
             })),
           });
 
-          const claimedMentionedMemberIds = await getClaimedMemberIds(
-            tx,
-            input.familyId,
-            input.mentions.map((mention) => mention.memberId),
-          );
+          const mentionRecipientIds = await resolveClaimedMentionRecipientIds(tx, {
+            familyId: input.familyId,
+            actorMemberId: membership.id,
+            directMemberIds: getMentionedMemberIds(input.mentions),
+            includeAll: hasAllMention(input.mentions),
+          });
 
-          const mentionSeeds = claimedMentionedMemberIds
-            .filter((memberId) => memberId !== membership.id)
+          const mentionSeeds = mentionRecipientIds
             .map((memberId) => ({
               familyId: input.familyId,
               recipientMemberId: memberId,

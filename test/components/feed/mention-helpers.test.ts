@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  createAllMentionMember,
   filterMentionMembers,
   getActiveMentionQuery,
   insertMentionAtQuery,
   normalizeMentionsForSubmit,
+  normalizeMentionsForSubmitWithFallback,
   reconcileMentionsOnTextChange,
   type MentionDraft,
 } from "~/components/feed/mention-helpers";
@@ -89,12 +91,41 @@ describe("insertMentionAtQuery", () => {
     expect(inserted.text).toBe("Hi @Parent One there");
     expect(inserted.mentions).toEqual([
       {
+        kind: "MEMBER",
         memberId: "member-1",
         start: 3,
         end: 14,
       },
     ]);
     expect(inserted.caret).toBe(14);
+  });
+
+  it("supports inserting special ALL mentions", () => {
+    const inserted = insertMentionAtQuery({
+      text: "Ping @al team",
+      mentions: [],
+      activeQuery: {
+        tokenStart: 5,
+        tokenEnd: 8,
+        query: "al",
+      },
+      member: {
+        kind: "ALL",
+        id: "all",
+        name: "all",
+        avatarUrl: "",
+      },
+    });
+
+    expect(inserted.text).toBe("Ping @all team");
+    expect(inserted.mentions).toEqual([
+      {
+        kind: "ALL",
+        start: 5,
+        end: 9,
+      },
+    ]);
+    expect(inserted.caret).toBe(9);
   });
 });
 
@@ -119,6 +150,52 @@ describe("normalizeMentionsForSubmit", () => {
         end: 11,
       },
     ]);
+  });
+});
+
+describe("normalizeMentionsForSubmitWithFallback", () => {
+  it("infers member mentions from typed text when no structured mention was selected", () => {
+    const normalized = normalizeMentionsForSubmitWithFallback({
+      text: "Hello @Parent One",
+      mentions: [],
+      members: [{ id: "member-1", name: "Parent One", avatarUrl: "" }],
+    });
+
+    expect(normalized.text).toBe("Hello @Parent One");
+    expect(normalized.mentions).toEqual([
+      {
+        kind: "MEMBER",
+        memberId: "member-1",
+        start: 6,
+        end: 17,
+      },
+    ]);
+  });
+
+  it("infers the ALL mention from typed @all token", () => {
+    const normalized = normalizeMentionsForSubmitWithFallback({
+      text: "Ping @all please",
+      mentions: [],
+      members: [createAllMentionMember(), { id: "member-1", name: "Parent One", avatarUrl: "" }],
+    });
+
+    expect(normalized.mentions).toEqual([
+      {
+        kind: "ALL",
+        start: 5,
+        end: 9,
+      },
+    ]);
+  });
+
+  it("does not infer partial matches inside larger tokens", () => {
+    const normalized = normalizeMentionsForSubmitWithFallback({
+      text: "Email me at test@parent one",
+      mentions: [],
+      members: [{ id: "member-1", name: "Parent", avatarUrl: "" }],
+    });
+
+    expect(normalized.mentions).toEqual([]);
   });
 });
 
@@ -149,5 +226,31 @@ describe("filterMentionMembers", () => {
     });
 
     expect(result).toEqual([]);
+  });
+
+  it("includes the ALL mention option when query matches", () => {
+    const result = filterMentionMembers({
+      members: [createAllMentionMember(), ...members],
+      activeQuery: {
+        tokenStart: 0,
+        tokenEnd: 3,
+        query: "all",
+      },
+    });
+
+    expect(result[0]).toMatchObject({ kind: "ALL", name: "all" });
+  });
+
+  it("returns the ALL mention option when query is empty", () => {
+    const result = filterMentionMembers({
+      members: [createAllMentionMember(), ...members],
+      activeQuery: {
+        tokenStart: 0,
+        tokenEnd: 1,
+        query: "",
+      },
+    });
+
+    expect(result[0]).toMatchObject({ kind: "ALL", name: "all" });
   });
 });

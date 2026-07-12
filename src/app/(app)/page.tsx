@@ -37,6 +37,7 @@ function mapFeedItemToPostCardData(item: {
   caption: string | null;
   mentions?: Array<{
     id: string;
+    kind: "MEMBER" | "ALL";
     start: number;
     end: number;
     member: {
@@ -44,7 +45,7 @@ function mapFeedItemToPostCardData(item: {
       name: string;
       slug: string;
       avatarUrl: string;
-    };
+    } | null;
   }>;
   likedByCurrentUser?: boolean;
   reactionCount?: number;
@@ -245,7 +246,7 @@ export default function FeedPage() {
           </header>
 
           <div className="supports-backdrop-filter:bg-background/80 sticky top-0 z-20 -mx-1 hidden rounded-3xl bg-background/95 px-1 pb-2 pt-1 backdrop-blur md:block">
-            <ComposerEntry user={currentUser} familyId={familyId} />
+            <ComposerEntry user={currentUser} familyId={familyId} allowAllMention={isAdmin} />
           </div>
 
           {shouldShowStorageConfigNotice ? (
