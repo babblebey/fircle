@@ -1,17 +1,25 @@
 import { randomBytes } from "node:crypto"
 
 import { emailsMatch, normalizeEmail } from "~/lib/email"
+import {
+  CLAIM_DEFAULT_TTL_DAYS,
+  INVITE_DEFAULT_TTL_DAYS,
+  INVITE_STATUSES,
+  INVITE_TYPES,
+  type InviteStatusValue,
+  type InviteTypeValue,
+} from "~/lib/invite-constants"
 
-export const INVITE_DEFAULT_TTL_DAYS = 14
-export const CLAIM_DEFAULT_TTL_DAYS = 30
-
-export const INVITE_TYPES = ["OPEN", "EMAIL_BOUND"] as const
-export const INVITE_STATUSES = ["PENDING", "CLAIMED", "EXPIRED", "REVOKED"] as const
-
-export type InviteTypeValue = (typeof INVITE_TYPES)[number]
-export type InviteStatusValue = (typeof INVITE_STATUSES)[number]
+export {
+  CLAIM_DEFAULT_TTL_DAYS,
+  INVITE_DEFAULT_TTL_DAYS,
+  INVITE_STATUSES,
+  INVITE_TYPES,
+}
+export type { InviteStatusValue, InviteTypeValue }
 
 export type InviteLifecycleState = "valid" | "expired" | "claimed" | "revoked"
+export type ReusableInviteLifecycleState = "valid" | "revoked" | "invalid"
 
 /** All states a looked-up claim link can be in, including "not found". */
 export type ClaimLifecycleState = "valid" | "expired" | "claimed" | "revoked" | "invalid"
@@ -20,6 +28,12 @@ export type InviteLifecycleRecord = {
   status: InviteStatusValue
   expiresAt: Date
   claimedAt: Date | null
+  revokedAt: Date | null
+}
+
+export type ReusableInviteLifecycleRecord = {
+  isReusable: boolean
+  status: InviteStatusValue
   revokedAt: Date | null
 }
 
@@ -89,6 +103,32 @@ export function isInviteUsable(
   now: Date = new Date(),
 ): boolean {
   return invite.status === "PENDING" && getInviteLifecycleState(invite, now) === "valid"
+}
+
+export function isReusableInvite(invite: Pick<ReusableInviteLifecycleRecord, "isReusable">): boolean {
+  return invite.isReusable
+}
+
+export function getReusableInviteLifecycleState(
+  invite: ReusableInviteLifecycleRecord | null,
+): ReusableInviteLifecycleState {
+  if (!invite?.isReusable) {
+    return "invalid"
+  }
+
+  if (invite.revokedAt || invite.status === "REVOKED") {
+    return "revoked"
+  }
+
+  if (invite.status !== "PENDING") {
+    return "invalid"
+  }
+
+  return "valid"
+}
+
+export function isReusableInviteUsable(invite: ReusableInviteLifecycleRecord | null): boolean {
+  return getReusableInviteLifecycleState(invite) === "valid"
 }
 
 export function validateInviteEmailBinding(
