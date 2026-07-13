@@ -3,15 +3,16 @@
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
-import { AlertCircle, ShieldCheck } from "~/components/ui/icons";
+import { AlertCircle } from "~/components/ui/icons";
 
 import { ThemeToggle } from "~/components/theme-toggle";
 import { beginNavigationProgress } from "~/components/nav/navigation-progress";
 import { Alert, AlertDescription, AlertTitle } from "~/components/ui/alert";
+import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Skeleton } from "~/components/ui/skeleton";
-import { formatFamilyDisplayName } from "~/lib/family-name";
+import { formatFamilyLockup } from "~/lib/family-name";
 import { api } from "~/trpc/react";
 
 function getClaimErrorMessage(error: unknown) {
@@ -33,6 +34,20 @@ function getClaimErrorState(errorMessage: string | null) {
   }
 
   return null;
+}
+
+function getInitials(name: string): string {
+  const normalized = name.trim();
+  if (!normalized) {
+    return "?";
+  }
+
+  const parts = normalized.split(/\s+/).filter(Boolean);
+  if (parts.length === 1) {
+    return parts[0]!.slice(0, 1).toUpperCase();
+  }
+
+  return `${parts[0]!.slice(0, 1)}${parts[parts.length - 1]!.slice(0, 1)}`.toUpperCase();
 }
 
 export default function ClaimAccountPage() {
@@ -97,27 +112,25 @@ export default function ClaimAccountPage() {
           <div className="space-y-6">
             <header className="space-y-2 text-center sm:text-left">
               <h1 className="font-heading text-3xl font-semibold tracking-tight text-balance">
-                Claim family profile
+                Claim your profile
               </h1>
               <p className="text-sm text-muted-foreground sm:text-base">
-                Confirm your details to activate an existing family profile.
+                Confirm your details to activate your profile in {formatFamilyLockup(claimPreviewQuery.data.family.name)}.
               </p>
             </header>
 
             <div className="rounded-3xl border border-border/80 bg-muted/40 p-5">
-              <div className="flex items-start gap-3">
-                <div className="rounded-xl border border-border/80 bg-background/80 p-2 text-muted-foreground">
-                  <ShieldCheck className="size-4" aria-hidden="true" />
-                </div>
-
-                <div className="space-y-2 text-sm">
-                  <p className="font-semibold text-base">{claimPreviewQuery.data.member.name}</p>
-                  <p className="text-muted-foreground">{formatFamilyDisplayName(claimPreviewQuery.data.family.name)}</p>
-                  <p className="text-muted-foreground">Prepared by a family admin</p>
-                  <p className="text-muted-foreground">
-                    Claiming this link will activate this existing profile instead of creating a duplicate person.
-                  </p>
-                </div>
+              <div className="flex items-center gap-3">
+                <Avatar className="size-12 border border-border/80">
+                  <AvatarImage
+                    src={claimPreviewQuery.data.member.image ?? undefined}
+                    alt={claimPreviewQuery.data.member.name}
+                  />
+                  <AvatarFallback className="text-sm font-semibold text-foreground">
+                    {getInitials(claimPreviewQuery.data.member.name)}
+                  </AvatarFallback>
+                </Avatar>
+                <p className="text-base font-semibold">{claimPreviewQuery.data.member.name}</p>
               </div>
             </div>
 
