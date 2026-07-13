@@ -175,7 +175,7 @@ export default function GalleryPage() {
 
   return (
     <section className="w-full px-4 py-8 sm:px-6 lg:px-8">
-      <div className="mx-auto w-full max-w-6xl space-y-6">
+      <div className="mx-auto w-full max-w-7xl space-y-6">
         <header className="space-y-1 mx-auto w-full max-w-2xl">
           <h1 className="text-3xl font-semibold tracking-tight">Gallery</h1>
           <p className="mt-1 text-sm text-muted-foreground">

@@ -248,7 +248,7 @@ export default function ProfilePage() {
               )}
 
               {activeTab === "gallery" && member ? (
-                <div className="space-y-4 mx-auto max-w-6xl">
+                <div className="space-y-4 mx-auto max-w-7xl">
                   <MemberGalleryTab familyId={familyId} memberId={member.id} memberName={member.name} />
                 </div>
               ) : null}
