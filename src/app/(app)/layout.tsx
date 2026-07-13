@@ -61,7 +61,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <PushPermissionRequest />
         <div className="flex min-h-dvh bg-background">
           <DesktopSidebar primaryLockup={brandContext.primaryLockup} />
-          <div className="flex min-w-0 flex-1 flex-col md:pl-72">
+          <div className="flex min-w-0 flex-1 flex-col md:pl-20 lg:pl-72">
             <MobileHeader primaryLockup={brandContext.primaryLockup} />
             <div className="flex min-h-0 flex-1">
               <main className="min-w-0 flex-1 overflow-y-auto pb-[calc(4rem+var(--safe-area-inset-bottom))] md:pb-0">
