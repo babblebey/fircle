@@ -266,6 +266,7 @@ export default function AddMemberPage() {
           familyId: selectedFamilyId,
           memberId: data.id,
           name: normalizedName,
+          nickname: normalizedNickname.length > 0 ? normalizedNickname : undefined,
           image: avatarIntent.readUrl,
         });
       }
