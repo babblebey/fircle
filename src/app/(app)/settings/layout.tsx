@@ -107,6 +107,12 @@ export default function SettingsLayout({
   const activeSettingsLabel =
     visibleSettingsNav.find((item) => item.href === activeSettingsHref)?.label ?? "Settings";
 
+  useEffect(() => {
+    for (const item of visibleSettingsNav) {
+      void router.prefetch(item.href);
+    }
+  }, [router, visibleSettingsNav]);
+
   function navigateToSettings(href: string) {
     if (href === pathname) return;
     beginNavigationProgress();
@@ -162,6 +168,7 @@ export default function SettingsLayout({
                 <li key={item.href} className="min-w-0 md:flex-none">
                   <Link
                     href={item.href}
+                    prefetch
                     aria-current={active ? "page" : undefined}
                     className={cn(
                       "block min-w-0 rounded-lg px-3 py-2 text-sm font-medium transition-colors",

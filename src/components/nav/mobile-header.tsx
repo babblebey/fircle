@@ -1,8 +1,8 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { Bell, House, Image, Menu, Settings, Sparkles, User, Users } from "~/components/ui/icons";
 
 import { FamilyLogotypeLockup } from "~/components/branding/family-logotype-lockup";
@@ -50,6 +50,7 @@ function isSettingsPath(pathname: string) {
 
 export function MobileHeader({ primaryLockup: _primaryLockup }: { primaryLockup: string }) {
   const pathname = usePathname();
+  const router = useRouter();
   const shouldPollUnread = !pathname.startsWith("/notifications");
 
   const managementContext = api.family.getManagementContext.useQuery(undefined, {
@@ -102,6 +103,15 @@ export function MobileHeader({ primaryLockup: _primaryLockup }: { primaryLockup:
     return [...baseMenuItems, ...featureItems];
   }, [featureActivationQuery.data?.activations]);
 
+  useEffect(() => {
+    for (const item of menuItems) {
+      void router.prefetch(item.href);
+    }
+
+    void router.prefetch("/settings");
+    void router.prefetch("/notifications");
+  }, [menuItems, router]);
+
   return (
     <header className="sticky top-0 z-30 flex h-[calc(3.5rem+var(--safe-area-inset-top))] w-full items-center border-b border-border bg-background/80 px-3 pt-safe backdrop-blur-sm md:hidden">
       <div className="flex w-full items-center justify-between">
@@ -150,6 +160,7 @@ export function MobileHeader({ primaryLockup: _primaryLockup }: { primaryLockup:
                       <SheetClose asChild>
                         <Link
                           href={item.href}
+                          prefetch
                           className={cn(
                             "flex items-center gap-3 rounded-xl px-3 py-2.5 text-base font-medium transition-colors",
                             active
@@ -175,6 +186,7 @@ export function MobileHeader({ primaryLockup: _primaryLockup }: { primaryLockup:
               <SheetClose asChild>
                 <Link
                   href="/settings"
+                  prefetch
                   className={cn(
                     "flex items-center gap-3 rounded-xl px-3 py-2.5 text-base font-medium transition-colors",
                     isSettingsPath(pathname) ? "bg-muted text-foreground" : "hover:bg-muted",
@@ -216,7 +228,7 @@ export function MobileHeader({ primaryLockup: _primaryLockup }: { primaryLockup:
             aria-label="Notifications"
             className="relative"
           >
-            <Link href="/notifications">
+            <Link href="/notifications" prefetch>
               <Bell className="size-5" />
               {unreadLabel ? (
                 <span className="absolute -top-1 -right-1 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-semibold text-white">

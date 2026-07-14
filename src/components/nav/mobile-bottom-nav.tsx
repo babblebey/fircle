@@ -1,8 +1,8 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { House, Image, PlusCircle, Sparkles, User, Users } from "~/components/ui/icons";
 
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
@@ -57,6 +57,7 @@ function getInitials(name: string) {
 
 export function MobileBottomNav({ currentUser }: MobileBottomNavProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const { openComposer } = useGlobalComposer();
 
   const managementContext = api.family.getManagementContext.useQuery(undefined, {
@@ -106,6 +107,13 @@ export function MobileBottomNav({ currentUser }: MobileBottomNavProps) {
   const profileName = memberQuery.data?.name ?? currentUser?.name ?? undefined;
   const profileImage = memberQuery.data?.image ?? currentUser?.image ?? undefined;
 
+  useEffect(() => {
+    for (const item of items) {
+      if (item.action === "composer") continue;
+      void router.prefetch(item.href);
+    }
+  }, [items, router]);
+
   return (
     <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background px-safe md:hidden">
       <ul className="mx-auto flex h-[calc(3.5rem+var(--safe-area-inset-bottom))] max-w-screen-sm items-center justify-around px-2 pb-safe">
@@ -138,6 +146,7 @@ export function MobileBottomNav({ currentUser }: MobileBottomNavProps) {
               ) : (
                 <Link
                   href={item.href}
+                  prefetch
                   title={item.label}
                   className={cn(
                     "flex w-full flex-col items-center justify-center gap-0.5 py-1 text-xs font-medium",
