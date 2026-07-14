@@ -316,7 +316,7 @@ export function PostCard({
       </header>
 
       {post.body ? (
-        <p className="mt-3 text-foreground text-sm leading-6 sm:text-base">
+        <p className="mt-3 whitespace-pre-wrap wrap-break-word text-foreground text-sm leading-6 sm:text-base">
           <MentionText
             text={post.body}
             mentions={post.mentions}
