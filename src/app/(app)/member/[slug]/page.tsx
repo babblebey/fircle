@@ -107,7 +107,7 @@ import { cn } from "~/lib/utils";
 
 type ProfileTab = "posts" | "tagged" | "liked" | "gallery";
 
-const tabs: { id: ProfileTab; label: string; icon: typeof Dash }[] = [
+const allTabs: { id: ProfileTab; label: string; icon: typeof Dash }[] = [
   { id: "posts", label: "Posts", icon: Dash },
   { id: "gallery", label: "Gallery", icon: Image },
   { id: "tagged", label: "Mentions & Tags", icon: UserSquare },
@@ -163,6 +163,24 @@ export default function MemberProfilePage() {
         recentActivity: [],
       } satisfies FamilyMemberProfile)
     : undefined;
+
+  // Filter tabs based on member status (hide Posts and Liked for unclaimed members)
+  const isMemberClaimed = member?.status === "claimed";
+  const visibleTabs = allTabs.filter((tab) => {
+    if (!isMemberClaimed && (tab.id === "posts" || tab.id === "liked")) {
+      return false;
+    }
+    return true;
+  });
+
+  // Reset active tab if it's hidden for unclaimed members
+  const isActivTabVisible = visibleTabs.some((tab) => tab.id === activeTab);
+  if (!isActivTabVisible && visibleTabs.length > 0) {
+    const firstVisibleTab = visibleTabs[0];
+    if (firstVisibleTab && activeTab !== firstVisibleTab.id) {
+      setActiveTab(firstVisibleTab.id);
+    }
+  }
 
   const viewerRole = managementContext.data?.role?.toLowerCase();
   const callerRole: "owner" | "admin" | "member" =
@@ -221,7 +239,7 @@ export default function MemberProfilePage() {
 
           <section>
             <div className="flex w-full max-w-2xl mx-auto border-b">
-              {tabs.map(({ id, label, icon: Icon }) => (
+              {visibleTabs.map(({ id, label, icon: Icon }) => (
                 <button
                   key={id}
                   type="button"

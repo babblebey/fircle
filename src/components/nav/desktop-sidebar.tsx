@@ -1,8 +1,8 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { Bell, House, Image, Plus, Settings, Sparkles, User, Users } from "~/components/ui/icons";
 
 import { FamilyLogotypeLockup } from "~/components/branding/family-logotype-lockup";
@@ -43,6 +43,7 @@ function isSettingsPath(pathname: string) {
 
 export function DesktopSidebar({ primaryLockup }: { primaryLockup: string }) {
   const pathname = usePathname();
+  const router = useRouter();
   const { openComposer } = useGlobalComposer();
   const shouldPollUnread = !pathname.startsWith("/notifications");
 
@@ -94,10 +95,18 @@ export function DesktopSidebar({ primaryLockup }: { primaryLockup: string }) {
 
   const unreadLabel = formatUnreadBadgeCount(unreadCountQuery.data?.count ?? 0);
 
+  useEffect(() => {
+    for (const item of items) {
+      void router.prefetch(item.href);
+    }
+
+    void router.prefetch("/settings");
+  }, [items, router]);
+
   return (
     <aside className="fixed top-0 left-0 hidden h-screen w-20 border-r border-border bg-background md:flex md:flex-col lg:w-72">
       <div className={`flex h-16 items-center justify-center px-2 lg:justify-start lg:px-6 ${selectedLogotypeFontName && "lg:ml-2"}`}>
-        <Link href="/" className="inline-flex items-center justify-center gap-2" aria-label={`${primaryLockup} home`}>
+        <Link href="/" prefetch className="inline-flex items-center justify-center gap-2" aria-label={`${primaryLockup} home`}>
           {selectedLogotypeFontName ? (
             <>
               <span
@@ -142,7 +151,7 @@ export function DesktopSidebar({ primaryLockup }: { primaryLockup: string }) {
                 active && "bg-muted font-semibold hover:bg-muted"
               )}
             >
-              <Link href={item.href} aria-label={item.label} className="inline-flex w-full items-center justify-center lg:justify-start lg:gap-3">
+              <Link href={item.href} prefetch aria-label={item.label} className="inline-flex w-full items-center justify-center lg:justify-start lg:gap-3">
                 <span className="relative inline-flex">
                   <Icon className="size-6" />
                   {item.href === "/notifications" && unreadLabel ? (
@@ -193,7 +202,7 @@ export function DesktopSidebar({ primaryLockup }: { primaryLockup: string }) {
               : "text-foreground"
           )}
         >
-          <Link href="/settings" className="inline-flex w-full items-center justify-center lg:justify-start lg:gap-3">
+          <Link href="/settings" prefetch className="inline-flex w-full items-center justify-center lg:justify-start lg:gap-3">
             <Settings className="size-6" />
             <span className="hidden lg:inline">Settings</span>
           </Link>
